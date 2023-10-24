@@ -4,6 +4,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.Collections;
@@ -24,7 +25,7 @@ namespace Microsoft.CodeAnalysis.Classification
         public abstract void AddLexicalClassifications(SourceText text, TextSpan textSpan, SegmentedList<ClassifiedSpan> result, CancellationToken cancellationToken);
         public abstract ClassifiedSpan AdjustStaleClassification(SourceText text, ClassifiedSpan classifiedSpan);
 
-        public Task AddSemanticClassificationsAsync(
+        public Task OldAddSemanticClassificationsAsync(
             Document document, TextSpan textSpan, ClassificationOptions options, SegmentedList<ClassifiedSpan> result, CancellationToken cancellationToken)
         {
             return AddClassificationsAsync(document, textSpan, options, ClassificationType.Semantic, result, cancellationToken);
@@ -35,6 +36,38 @@ namespace Microsoft.CodeAnalysis.Classification
         {
             return AddClassificationsAsync(document, textSpan, options, ClassificationType.EmbeddedLanguage, result, cancellationToken);
         }
+
+        public Task AddSemanticClassificationsAsync(
+            Document document, ImmutableArray<TextSpan> textSpans, ClassificationOptions options, ArrayBuilder<SegmentedList<ClassifiedSpan>> result, CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+            //return Task.Run(async () =>
+            //{
+            //    using var _2 = Classifier.GetPooledList(out var semanticSpanz);
+            //    for (var i = 0; i < textSpans.Length; i++)
+            //    {
+            //        var textSpan = textSpans[i];
+            //        await AddClassificationsAsync(document, textSpan, options, ClassificationType.Semantic, semanticSpanz, cancellationToken)
+            //            .ConfigureAwait(false);
+            //        result.Add(semanticSpanz);
+            //    }
+            //}, cancellationToken);
+        }
+
+        //public Task AddEmbeddedLanguageClassificationsAsync(
+        //    Document document, ImmutableArray<TextSpan> textSpans, ClassificationOptions options, ArrayBuilder<SegmentedList<ClassifiedSpan>> result, CancellationToken cancellationToken)
+        //{
+        //    return AddClassificationsAsync(document, textSpans, options, ClassificationType.EmbeddedLanguage, result, cancellationToken);
+        //}
+
+        //private static async Task AddClassificationsAsync(
+        //    Document document,
+        //    ImmutableArray<TextSpan> textSpans,
+        //    ClassificationOptions options,
+        //    ClassificationType type,
+        //    ArrayBuilder<SegmentedList<ClassifiedSpan>> result,
+        //    CancellationToken cancellationToken)
+        //{ }
 
         private static async Task AddClassificationsAsync(
             Document document,
@@ -158,7 +191,7 @@ namespace Microsoft.CodeAnalysis.Classification
                 var getNodeClassifiers = extensionManager.CreateNodeExtensionGetter(classifiers, c => c.SyntaxNodeTypes);
                 var getTokenClassifiers = extensionManager.CreateTokenExtensionGetter(classifiers, c => c.SyntaxTokenKinds);
 
-                await classificationService.AddSemanticClassificationsAsync(
+                await classificationService.OldAddSemanticClassificationsAsync(
                     document, textSpan, options, getNodeClassifiers, getTokenClassifiers, result, cancellationToken).ConfigureAwait(false);
 
                 if (options.ClassifyReassignedVariables)

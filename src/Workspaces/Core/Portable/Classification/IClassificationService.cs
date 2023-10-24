@@ -3,6 +3,7 @@
 // See the LICENSE file in the project root for more information.
 
 using System;
+using System.Collections.Immutable;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.Collections;
@@ -51,13 +52,17 @@ namespace Microsoft.CodeAnalysis.Classification
         /// This will not include classifications for embedded language constructs in string literals.  For that use
         /// <see cref="AddEmbeddedLanguageClassificationsAsync"/>.
         /// </remarks>
-        Task AddSemanticClassificationsAsync(Document document, TextSpan textSpan, ClassificationOptions options, SegmentedList<ClassifiedSpan> result, CancellationToken cancellationToken);
+        Task OldAddSemanticClassificationsAsync(Document document, TextSpan textSpan, ClassificationOptions options, SegmentedList<ClassifiedSpan> result, CancellationToken cancellationToken);
 
         /// <summary>
         /// Produce the classifications for embedded language string literals (e.g. Regex/Json strings) in the span of
         /// text specified.
         /// </summary>
         Task AddEmbeddedLanguageClassificationsAsync(Document document, TextSpan textSpan, ClassificationOptions options, SegmentedList<ClassifiedSpan> result, CancellationToken cancellationToken);
+
+        Task AddSemanticClassificationsAsync(Document document, ImmutableArray<TextSpan> textSpans, ClassificationOptions options, ArrayBuilder<SegmentedList<ClassifiedSpan>> result, CancellationToken cancellationToken);
+
+        //Task AddEmbeddedLanguageClassificationsAsync(Document document, ImmutableArray<TextSpan> textSpans, ClassificationOptions options, ArrayBuilder<SegmentedList<ClassifiedSpan>> result, CancellationToken cancellationToken);
 
         /// <summary>
         /// Adjust a classification from a previous version of text accordingly based on the current

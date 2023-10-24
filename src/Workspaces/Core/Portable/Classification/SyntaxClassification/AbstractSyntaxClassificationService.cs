@@ -31,6 +31,31 @@ namespace Microsoft.CodeAnalysis.Classification
 
         public async Task AddSemanticClassificationsAsync(
             Document document,
+            ImmutableArray<TextSpan> textSpans,
+            ClassificationOptions options,
+            Func<SyntaxNode, ImmutableArray<ISyntaxClassifier>> getNodeClassifiers,
+            Func<SyntaxToken, ImmutableArray<ISyntaxClassifier>> getTokenClassifiers,
+            ArrayBuilder<SegmentedList<ClassifiedSpan>> result,
+            CancellationToken cancellationToken)
+        {
+            try
+            {
+                var semanticModel = await document.GetRequiredSemanticModelAsync(cancellationToken).ConfigureAwait(false);
+                using var _1 = Classifier.GetPooledList(out var semanticSpanz);
+                for (var i = 0; i < textSpans.Length; i++)
+                {
+                    AddSemanticClassifications(semanticModel, textSpans[i], getNodeClassifiers, getTokenClassifiers, semanticSpanz, options, cancellationToken);
+                    result.Add(semanticSpanz);
+                }
+            }
+            catch (Exception e) when (FatalError.ReportAndPropagateUnlessCanceled(e, cancellationToken))
+            {
+                throw ExceptionUtilities.Unreachable();
+            }
+        }
+
+        public async Task OldAddSemanticClassificationsAsync(
+            Document document,
             TextSpan textSpan,
             ClassificationOptions options,
             Func<SyntaxNode, ImmutableArray<ISyntaxClassifier>> getNodeClassifiers,

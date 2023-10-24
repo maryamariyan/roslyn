@@ -85,7 +85,7 @@ class Program
 
             using var _ = Classifier.GetPooledList(out var results);
 
-            await service.AddSemanticClassificationsAsync(
+            await service.OldAddSemanticClassificationsAsync(
                 document,
                 span,
                 ClassificationOptions.Default,
