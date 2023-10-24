@@ -18,14 +18,6 @@ namespace Microsoft.CodeAnalysis.Classification
 {
     internal static partial class ClassifierHelper
     {
-        private static Random s_random = new Random();
-        private static bool stopExperiment = false;
-        private static List<long> s_old_semantic = new List<long>();
-        private static List<long> s_old = new List<long>();
-        private static List<long> s_old_merge = new List<long>();
-        private static List<long> s_new_semantic = new List<long>();
-        private static List<long> s_new = new List<long>();
-        private static List<long> s_new_merge = new List<long>();
         /// <summary>
         /// Classifies the provided <paramref name="spans"/> in the given <paramref name="document"/>. This will do this
         /// using an appropriate <see cref="IClassificationService"/> if that can be found.  <see
@@ -36,32 +28,13 @@ namespace Microsoft.CodeAnalysis.Classification
         /// overwritten'.  i.e. they add additional information to a previous classification.</param>
         public static async Task<ImmutableArray<ClassifiedSpan>> GetClassifiedSpansAsync(
             Document document,
-            TextSpan[] spans,
+            ImmutableArray<TextSpan> spans,
             ClassificationOptions options,
             bool includeAdditiveSpans,
             CancellationToken cancellationToken)
         {
-            using var _1 = ArrayBuilder<ImmutableArray<ClassifiedSpan>>.GetInstance(spans.Length, out var classifiedSpans);
-            using var _2 = ArrayBuilder<ClassifiedSpan>.GetInstance(out var flattenedClassifiedSpans);
-            var testSpans = spans.AsImmutable();
-            if (stopExperiment || s_random.Next(2) == 0)
-            {
-                var stopwatch = Stopwatch.StartNew();
-                // EITHER
-                classifiedSpans = await GetNewClassifiedSpansAsync(document, testSpans, options, includeAdditiveSpans, cancellationToken).ConfigureAwait(false);
-                s_new.Add(stopwatch.ElapsedMilliseconds);
-            }
-            else
-            {
-                var stopwatch2 = Stopwatch.StartNew();
-                // OR
-                for (var i = 0; i < spans.Length; i++)
-                {
-                    classifiedSpans.Add(await GetClassifiedSpansAsync(document, spans[i], options, includeAdditiveSpans, cancellationToken).ConfigureAwait(false));
-                }
-
-                s_old.Add(stopwatch2.ElapsedMilliseconds);
-            }
+            using var _ = ArrayBuilder<ClassifiedSpan>.GetInstance(out var flattenedClassifiedSpans);
+            var classifiedSpans = await GetNewClassifiedSpansAsync(document, spans, options, includeAdditiveSpans, cancellationToken).ConfigureAwait(false);
 
             for (var i = 0; i < classifiedSpans.Count; i++)
             {
@@ -110,9 +83,7 @@ namespace Microsoft.CodeAnalysis.Classification
 
             // Intentional that we're adding both semantic and embedded lang classifications to the same array.  Both
             // are 'semantic' from the perspective of this helper method.
-            var stopwatchXX = Stopwatch.StartNew();
             await classificationService.OldAddSemanticClassificationsAsync(document, span, options, semanticSpans, cancellationToken).ConfigureAwait(false);
-            s_old_semantic.Add(stopwatchXX.ElapsedMilliseconds);
             await classificationService.AddEmbeddedLanguageClassificationsAsync(document, span, options, semanticSpans, cancellationToken).ConfigureAwait(false);
 
             // MergeClassifiedSpans will ultimately filter multiple classifications for the same
@@ -121,7 +92,6 @@ namespace Microsoft.CodeAnalysis.Classification
             // remove additive ClassifiedSpans until we have support for additive classifications
             // in classified spans. https://github.com/dotnet/roslyn/issues/32770
             // The exception to this is LSP, which expects the additive spans.
-            var stopwatchX = Stopwatch.StartNew();
             if (!includeAdditiveSpans)
             {
                 RemoveAdditiveSpans(syntaxSpans);
@@ -129,7 +99,6 @@ namespace Microsoft.CodeAnalysis.Classification
             }
 
             var classifiedSpans = MergeClassifiedSpans(syntaxSpans, semanticSpans, span);
-            s_old_merge.Add(stopwatchX.ElapsedMilliseconds);
             return classifiedSpans;
         }
 
@@ -156,9 +125,7 @@ namespace Microsoft.CodeAnalysis.Classification
                 syntacticSpansArray.Add(syntaxSpanz);
             }
 
-            var stopwatchXX = Stopwatch.StartNew();
             await classificationService.AddSemanticClassificationsAsync(document, spans, options, semanticSpansArray, cancellationToken).ConfigureAwait(false);
-            s_new_semantic.Add(stopwatchXX.ElapsedMilliseconds);
 
             for (var i = 0; i < spans.Length; i++)
             {
@@ -167,7 +134,6 @@ namespace Microsoft.CodeAnalysis.Classification
                 semanticSpansArray.Add(semanticSpanz);
             }
 
-            var stopwatchX = Stopwatch.StartNew();
             using var _3 = ArrayBuilder<ImmutableArray<ClassifiedSpan>>.GetInstance(out var classifiedSpans);
             for (var i = 0; i < spans.Length; i++)
             {
@@ -183,7 +149,6 @@ namespace Microsoft.CodeAnalysis.Classification
 
                 classifiedSpans.Add(MergeClassifiedSpans(syntaxSpans, semanticSpans, span));
             }
-            s_new_merge.Add(stopwatchX.ElapsedMilliseconds);
 
             return classifiedSpans;
         }

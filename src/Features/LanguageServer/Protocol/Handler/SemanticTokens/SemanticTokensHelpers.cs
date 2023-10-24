@@ -117,7 +117,7 @@ namespace Microsoft.CodeAnalysis.LanguageServer.Handler.SemanticTokens
 
             // `includeAdditiveSpans` will add token modifiers such as 'static', which we want to include in LSP.
             var spans = await ClassifierHelper.GetClassifiedSpansAsync(
-                document, textSpans, options, includeAdditiveSpans: true, cancellationToken).ConfigureAwait(false);
+                document, textSpans.AsImmutable(), options, includeAdditiveSpans: true, cancellationToken).ConfigureAwait(false);
 
             // The spans returned to us may include some empty spans, which we don't care about. We also don't care
             // about the 'text' classification.  It's added for everything between real classifications (including
