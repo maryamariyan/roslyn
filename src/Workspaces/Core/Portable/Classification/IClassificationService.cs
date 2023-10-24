@@ -3,6 +3,7 @@
 // See the LICENSE file in the project root for more information.
 
 using System;
+using System.Collections.Immutable;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.Collections;
@@ -49,15 +50,33 @@ namespace Microsoft.CodeAnalysis.Classification
         /// </summary>
         /// <remarks>
         /// This will not include classifications for embedded language constructs in string literals.  For that use
+        /// <see cref="OldAddEmbeddedLanguageClassificationsAsync"/>.
+        /// </remarks>
+        Task OldAddSemanticClassificationsAsync(Document document, TextSpan textSpan, ClassificationOptions options, SegmentedList<ClassifiedSpan> result, CancellationToken cancellationToken);
+
+        /// <summary>
+        /// Produce the classifications for the span of text specified.  Semantics of the language can be used to
+        /// provide richer information for constructs where syntax is insufficient. For example, semantic information
+        /// can be used to determine if an identifier should be classified as a type, structure, or something else
+        /// entirely.
+        /// </summary>
+        /// <remarks>
+        /// This will not include classifications for embedded language constructs in string literals.  For that use
         /// <see cref="AddEmbeddedLanguageClassificationsAsync"/>.
         /// </remarks>
-        Task AddSemanticClassificationsAsync(Document document, TextSpan textSpan, ClassificationOptions options, SegmentedList<ClassifiedSpan> result, CancellationToken cancellationToken);
+        Task AddSemanticClassificationsAsync(Document document, ImmutableArray<TextSpan> textSpans, ClassificationOptions options, SegmentedList<ClassifiedSpan> result, CancellationToken cancellationToken);
 
         /// <summary>
         /// Produce the classifications for embedded language string literals (e.g. Regex/Json strings) in the span of
         /// text specified.
         /// </summary>
-        Task AddEmbeddedLanguageClassificationsAsync(Document document, TextSpan textSpan, ClassificationOptions options, SegmentedList<ClassifiedSpan> result, CancellationToken cancellationToken);
+        Task OldAddEmbeddedLanguageClassificationsAsync(Document document, TextSpan textSpan, ClassificationOptions options, SegmentedList<ClassifiedSpan> result, CancellationToken cancellationToken);
+ 
+        /// <summary>
+        /// Produce the classifications for embedded language string literals (e.g. Regex/Json strings) in the span of
+        /// text specified.
+        /// </summary>
+        Task AddEmbeddedLanguageClassificationsAsync(Document document, ImmutableArray<TextSpan> textSpans, ClassificationOptions options, SegmentedList<ClassifiedSpan> result, CancellationToken cancellationToken);
 
         /// <summary>
         /// Adjust a classification from a previous version of text accordingly based on the current

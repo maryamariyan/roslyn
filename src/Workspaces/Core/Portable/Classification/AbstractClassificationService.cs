@@ -4,6 +4,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.Collections;
@@ -24,24 +25,41 @@ namespace Microsoft.CodeAnalysis.Classification
         public abstract void AddLexicalClassifications(SourceText text, TextSpan textSpan, SegmentedList<ClassifiedSpan> result, CancellationToken cancellationToken);
         public abstract ClassifiedSpan AdjustStaleClassification(SourceText text, ClassifiedSpan classifiedSpan);
 
-        public Task AddSemanticClassificationsAsync(
+        public Task OldAddSemanticClassificationsAsync(
             Document document, TextSpan textSpan, ClassificationOptions options, SegmentedList<ClassifiedSpan> result, CancellationToken cancellationToken)
         {
-            return AddClassificationsAsync(document, textSpan, options, ClassificationType.Semantic, result, cancellationToken);
+            using var _ = ArrayBuilder<TextSpan>.GetInstance(out var textSpans);
+            textSpans.Add(textSpan);
+            return AddClassificationsAsync(document, textSpans.ToImmutable(), options, ClassificationType.Semantic, result, sendBulk: false, cancellationToken);
+        }
+
+        public Task AddSemanticClassificationsAsync(
+            Document document, ImmutableArray<TextSpan> textSpans, ClassificationOptions options, SegmentedList<ClassifiedSpan> result, CancellationToken cancellationToken)
+        {
+            return AddClassificationsAsync(document, textSpans, options, ClassificationType.Semantic, result, sendBulk: true, cancellationToken);
+        }
+
+        public Task OldAddEmbeddedLanguageClassificationsAsync(
+            Document document, TextSpan textSpan, ClassificationOptions options, SegmentedList<ClassifiedSpan> result, CancellationToken cancellationToken)
+        {
+            using var _ = ArrayBuilder<TextSpan>.GetInstance(out var textSpans);
+            textSpans.Add(textSpan);
+            return AddClassificationsAsync(document, textSpans.ToImmutable(), options, ClassificationType.EmbeddedLanguage, result, sendBulk: false, cancellationToken);
         }
 
         public Task AddEmbeddedLanguageClassificationsAsync(
-            Document document, TextSpan textSpan, ClassificationOptions options, SegmentedList<ClassifiedSpan> result, CancellationToken cancellationToken)
+            Document document, ImmutableArray<TextSpan> textSpans, ClassificationOptions options, SegmentedList<ClassifiedSpan> result, CancellationToken cancellationToken)
         {
-            return AddClassificationsAsync(document, textSpan, options, ClassificationType.EmbeddedLanguage, result, cancellationToken);
+            return AddClassificationsAsync(document, textSpans, options, ClassificationType.EmbeddedLanguage, result, sendBulk: true, cancellationToken);
         }
 
         private static async Task AddClassificationsAsync(
             Document document,
-            TextSpan textSpan,
+            ImmutableArray<TextSpan> textSpans,
             ClassificationOptions options,
             ClassificationType type,
             SegmentedList<ClassifiedSpan> result,
+            bool sendBulk,
             CancellationToken cancellationToken)
         {
             var classificationService = document.GetLanguageService<ISyntaxClassificationService>();
@@ -73,25 +91,30 @@ namespace Microsoft.CodeAnalysis.Classification
                 // service.GetSemanticClassificationsAsync below) as we want to try to read in the cached
                 // classifications without doing any syncing to the OOP process.
                 var isFullyLoaded = IsFullyLoaded(document, cancellationToken);
-                if (await TryGetCachedClassificationsAsync(document, textSpan, type, client, isFullyLoaded, result, cancellationToken).ConfigureAwait(false))
-                    return;
+                // TODO pass array, rather than looping over
+                for (var i = 0; i < textSpans.Length; i++)
+                {
+                    var textSpan = textSpans[i];
+                    if (await TryGetCachedClassificationsAsync(document, textSpan, type, client, isFullyLoaded, result, cancellationToken).ConfigureAwait(false))
+                        continue;
 
-                // Call the project overload.  Semantic classification only needs the current project's information
-                // to classify properly.
-                var classifiedSpans = await client.TryInvokeAsync<IRemoteSemanticClassificationService, SerializableClassifiedSpans>(
-                   document.Project,
-                   (service, solutionInfo, cancellationToken) => service.GetClassificationsAsync(
-                       solutionInfo, document.Id, textSpan, type, options, isFullyLoaded, cancellationToken),
-                   cancellationToken).ConfigureAwait(false);
+                    // Call the project overload.  Semantic classification only needs the current project's information
+                    // to classify properly.
+                    var classifiedSpans = await client.TryInvokeAsync<IRemoteSemanticClassificationService, SerializableClassifiedSpans>(
+                    document.Project,
+                    (service, solutionInfo, cancellationToken) => service.GetClassificationsAsync(
+                        solutionInfo, document.Id, textSpan, type, options, isFullyLoaded, cancellationToken),
+                    cancellationToken).ConfigureAwait(false);
 
-                // if the remote call fails do nothing (error has already been reported)
-                if (classifiedSpans.HasValue)
-                    classifiedSpans.Value.Rehydrate(result);
+                    // if the remote call fails do nothing (error has already been reported)
+                    if (classifiedSpans.HasValue)
+                        classifiedSpans.Value.Rehydrate(result);
+                }
             }
             else
             {
                 await AddClassificationsInCurrentProcessAsync(
-                    document, textSpan, type, options, result, cancellationToken).ConfigureAwait(false);
+                    document, textSpans, type, options, result, sendBulk, cancellationToken).ConfigureAwait(false);
             }
         }
 
@@ -141,10 +164,11 @@ namespace Microsoft.CodeAnalysis.Classification
 
         public static async Task AddClassificationsInCurrentProcessAsync(
             Document document,
-            TextSpan textSpan,
+            ImmutableArray<TextSpan> textSpans,
             ClassificationType type,
             ClassificationOptions options,
             SegmentedList<ClassifiedSpan> result,
+            bool sendBulk,
             CancellationToken cancellationToken)
         {
             if (type == ClassificationType.Semantic)
@@ -158,14 +182,29 @@ namespace Microsoft.CodeAnalysis.Classification
                 var getNodeClassifiers = extensionManager.CreateNodeExtensionGetter(classifiers, c => c.SyntaxNodeTypes);
                 var getTokenClassifiers = extensionManager.CreateTokenExtensionGetter(classifiers, c => c.SyntaxTokenKinds);
 
-                await classificationService.AddSemanticClassificationsAsync(
-                    document, textSpan, options, getNodeClassifiers, getTokenClassifiers, result, cancellationToken).ConfigureAwait(false);
+                // how many times is this called per request?
+                if (sendBulk)
+                {
+                    await classificationService.AddSemanticClassificationsAsync(
+                        document, textSpans, options, getNodeClassifiers, getTokenClassifiers, result, cancellationToken).ConfigureAwait(false);
+                }
+                else
+                {
+                    for (var i = 0; i < textSpans.Length; i++)
+                    {
+                        await classificationService.AddSemanticClassificationsAsync(
+                            document, textSpans[i], options, getNodeClassifiers, getTokenClassifiers, result, cancellationToken).ConfigureAwait(false);
+                    }
+                }
 
                 if (options.ClassifyReassignedVariables)
                 {
-                    var reassignedVariableSpans = await reassignedVariableService.GetLocationsAsync(document, textSpan, cancellationToken).ConfigureAwait(false);
-                    foreach (var span in reassignedVariableSpans)
-                        result.Add(new ClassifiedSpan(span, ClassificationTypeNames.ReassignedVariable));
+                    for (var i = 0; i < textSpans.Length; i++)
+                    {
+                        var reassignedVariableSpans = await reassignedVariableService.GetLocationsAsync(document, textSpans[i], cancellationToken).ConfigureAwait(false);
+                        foreach (var span in reassignedVariableSpans)
+                            result.Add(new ClassifiedSpan(span, ClassificationTypeNames.ReassignedVariable));
+                    }
                 }
             }
             else if (type == ClassificationType.EmbeddedLanguage)
@@ -173,8 +212,19 @@ namespace Microsoft.CodeAnalysis.Classification
                 var embeddedLanguageService = document.GetLanguageService<IEmbeddedLanguageClassificationService>();
                 if (embeddedLanguageService != null)
                 {
-                    await embeddedLanguageService.AddEmbeddedLanguageClassificationsAsync(
-                        document, textSpan, options, result, cancellationToken).ConfigureAwait(false);
+                    if (sendBulk)
+                    {
+                        await embeddedLanguageService.AddEmbeddedLanguageClassificationsAsync(
+                            document, textSpans, options, result, cancellationToken).ConfigureAwait(false);
+                    }
+                    else
+                    {
+                        for (var i = 0; i < textSpans.Length; i++)
+                        {
+                            await embeddedLanguageService.AddEmbeddedLanguageClassificationsAsync(
+                                document, textSpans[i], options, result, cancellationToken).ConfigureAwait(false);
+                        }
+                    }
                 }
             }
             else

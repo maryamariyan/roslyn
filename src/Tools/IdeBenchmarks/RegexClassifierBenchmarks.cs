@@ -83,11 +83,13 @@ class Program
             var classifiers = service.GetDefaultSyntaxClassifiers();
             var extensionManager = document.Project.Solution.Services.GetService<IExtensionManager>();
 
-            using var _ = Classifier.GetPooledList(out var results);
+            using var _1 = Classifier.GetPooledList(out var results);
+            using var _2 = ArrayBuilder<TextSpan>.GetInstance(out var textSpans);
+            textSpans.Add(span);
 
             await service.AddSemanticClassificationsAsync(
                 document,
-                span,
+                textSpans.ToImmutable(),
                 ClassificationOptions.Default,
                 extensionManager.CreateNodeExtensionGetter(classifiers, c => c.SyntaxNodeTypes),
                 extensionManager.CreateTokenExtensionGetter(classifiers, c => c.SyntaxTokenKinds),

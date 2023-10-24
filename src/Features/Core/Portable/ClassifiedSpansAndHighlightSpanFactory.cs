@@ -8,6 +8,7 @@ using System;
 using System.Collections.Immutable;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.CodeAnalysis.PooledObjects;
 using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.CodeAnalysis.Text;
 
@@ -85,8 +86,10 @@ namespace Microsoft.CodeAnalysis.Classification
         {
             // We don't present things like static/assigned variables differently.  So pass `includeAdditiveSpans:
             // false` as we don't need that data.
+            using var _ = ArrayBuilder<TextSpan>.GetInstance(out var textSpans);
+            textSpans.Add(widenedSpan);
             var result = await ClassifierHelper.GetClassifiedSpansAsync(
-                document, widenedSpan, options, includeAdditiveSpans: false, cancellationToken).ConfigureAwait(false);
+                document, textSpans.ToImmutable(), options, includeAdditiveSpans: false, sendBulk: false, cancellationToken).ConfigureAwait(false);
             if (!result.IsDefault)
                 return result;
 

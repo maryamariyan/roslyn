@@ -2,6 +2,7 @@
 ' The .NET Foundation licenses this file to you under the MIT license.
 ' See the LICENSE file in the project root for more information.
 
+Imports System.Collections.Immutable
 Imports System.Composition
 Imports System.Threading
 Imports Microsoft.CodeAnalysis.Classification
@@ -93,9 +94,10 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.Classification
 
                 Dim document = workspace.CurrentSolution.Projects.Single().Documents.Single()
                 Dim text = Await document.GetTextAsync()
+                Dim textSpans As ImmutableArray(Of TextSpan) = ImmutableArray.Create(New TextSpan(0, text.Length))
 
                 Dim spans = Await ClassifierHelper.GetClassifiedSpansAsync(
-                    document, New TextSpan(0, text.Length), ClassificationOptions.Default, includeAdditiveSpans:=False, CancellationToken.None)
+                    document, textSpans, ClassificationOptions.Default, includeAdditiveSpans:=False, sendBulk:=False, CancellationToken.None)
 
                 Assert.Equal(
 "(text, '<spaces>', [0..26))
@@ -154,9 +156,10 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.Classification
 
                 Dim document = workspace.CurrentSolution.Projects.Single().Documents.Single()
                 Dim text = Await document.GetTextAsync()
+                Dim textSpans As ImmutableArray(Of TextSpan) = ImmutableArray.Create(New TextSpan(0, text.Length))
 
                 Dim spans = Await ClassifierHelper.GetClassifiedSpansAsync(
-                    document, New TextSpan(0, text.Length), ClassificationOptions.Default, includeAdditiveSpans:=False, CancellationToken.None)
+                    document, textSpans, ClassificationOptions.Default, includeAdditiveSpans:=False, sendBulk:=False, CancellationToken.None)
 
                 Assert.Equal(
 "(text, '<spaces>', [0..26))
@@ -353,6 +356,10 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.Classification
                 Return Task.CompletedTask
             End Function
 
+            Public Function AddSemanticClassificationsAsync(document As Document, textSpans As ImmutableArray(Of TextSpan), options As ClassificationOptions, result As SegmentedList(Of ClassifiedSpan), cancellationToken As CancellationToken) As Task Implements IClassificationService.AddSemanticClassificationsAsync
+                Return Task.CompletedTask
+            End Function
+
             Public Function AddSyntacticClassificationsAsync(document As Document, textSpan As TextSpan, result As SegmentedList(Of ClassifiedSpan), cancellationToken As CancellationToken) As Task Implements IClassificationService.AddSyntacticClassificationsAsync
                 Return Task.CompletedTask
             End Function
@@ -369,6 +376,10 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.Classification
             End Function
 
             Public Function AddEmbeddedLanguageClassificationsAsync(document As Document, textSpan As TextSpan, options As ClassificationOptions, result As SegmentedList(Of ClassifiedSpan), cancellationToken As CancellationToken) As Task Implements IClassificationService.AddEmbeddedLanguageClassificationsAsync
+                Return Task.CompletedTask
+            End Function
+
+            Public Function AddEmbeddedLanguageClassificationsAsync(document As Document, textSpans As ImmutableArray(Of TextSpan), options As ClassificationOptions, result As SegmentedList(Of ClassifiedSpan), cancellationToken As CancellationToken) As Task Implements IClassificationService.AddEmbeddedLanguageClassificationsAsync
                 Return Task.CompletedTask
             End Function
         End Class

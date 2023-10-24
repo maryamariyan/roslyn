@@ -33,7 +33,17 @@ namespace Microsoft.CodeAnalysis.Classification
         /// <inheritdoc cref="IClassificationService.AddSemanticClassificationsAsync"/>
         Task AddSemanticClassificationsAsync(
             Document document,
-            TextSpan textSpan,
+            ImmutableArray<TextSpan> textSpans,
+            ClassificationOptions options,
+            Func<SyntaxNode, ImmutableArray<ISyntaxClassifier>> getNodeClassifiers,
+            Func<SyntaxToken, ImmutableArray<ISyntaxClassifier>> getTokenClassifiers,
+            SegmentedList<ClassifiedSpan> result,
+            CancellationToken cancellationToken);
+
+        /// <inheritdoc cref="IClassificationService.AddSemanticClassificationsAsync"/>
+        Task OldAddSemanticClassificationsAsync(
+            Document document,
+            TextSpan textSpans,
             ClassificationOptions options,
             Func<SyntaxNode, ImmutableArray<ISyntaxClassifier>> getNodeClassifiers,
             Func<SyntaxToken, ImmutableArray<ISyntaxClassifier>> getTokenClassifiers,

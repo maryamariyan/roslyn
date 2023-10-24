@@ -41,9 +41,11 @@ namespace Microsoft.CodeAnalysis.Remote
                     document = document.WithFrozenPartialSemantics(cancellationToken);
                 }
 
-                using var _ = Classifier.GetPooledList(out var temp);
+                using var _1 = Classifier.GetPooledList(out var temp);
+                using var _2 = ArrayBuilder<TextSpan>.GetInstance(out var textSpans);
+                textSpans.Add(span);
                 await AbstractClassificationService.AddClassificationsInCurrentProcessAsync(
-                    document, span, type, options, temp, cancellationToken).ConfigureAwait(false);
+                    document, textSpans.ToImmutable(), type, options, temp, sendBulk: false, cancellationToken).ConfigureAwait(false);
 
                 if (isFullyLoaded)
                 {
