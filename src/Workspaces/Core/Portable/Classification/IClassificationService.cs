@@ -52,7 +52,7 @@ namespace Microsoft.CodeAnalysis.Classification
         /// This will not include classifications for embedded language constructs in string literals.  For that use
         /// <see cref="AddEmbeddedLanguageClassificationsAsync"/>.
         /// </remarks>
-        Task AddSemanticClassificationsAsync(Document document, ImmutableArray<TextSpan> textSpans, ClassificationOptions options, ArrayBuilder<SegmentedList<ClassifiedSpan>> result, CancellationToken cancellationToken);
+        Task AddSemanticClassificationsAsync(Document document, ImmutableArray<TextSpan> textSpans, ClassificationOptions options, ArrayBuilder<PooledObject<SegmentedList<ClassifiedSpan>>> result, CancellationToken cancellationToken);
 
         Task ToBeRemovedAsync(Document document, TextSpan textSpan, ClassificationOptions options, SegmentedList<ClassifiedSpan> result, CancellationToken cancellationToken);
 

@@ -34,8 +34,8 @@ namespace Microsoft.CodeAnalysis.Classification
         {
             using var _ = ArrayBuilder<ClassifiedSpan>.GetInstance(out var flatten);
             var classifiedSpans = await GetNewClassifiedSpansAsync(document, spans, options, includeAdditiveSpans, cancellationToken).ConfigureAwait(false);
-
-            for (var i = 0; i < classifiedSpans.Count; i++)
+  
+            for (var i = 0; i < classifiedSpans.Length; i++)
             {
                 var classifiedSpan = classifiedSpans[i];
                 for (var j = 0; j < classifiedSpan.Length; j++)
@@ -44,8 +44,7 @@ namespace Microsoft.CodeAnalysis.Classification
                 }
             }
 
-            var flattenedSpans = flatten.ToImmutable();
-            return flattenedSpans;
+            return flatten.ToImmutableAndClear();
         }
 
         /// <summary>
@@ -101,7 +100,7 @@ namespace Microsoft.CodeAnalysis.Classification
             return classifiedSpans;
         }
 
-        public static async Task<ArrayBuilder<ImmutableArray<ClassifiedSpan>>> GetNewClassifiedSpansAsync(
+        public static async Task<ImmutableArray<ImmutableArray<ClassifiedSpan>>> GetNewClassifiedSpansAsync(
         Document document,
         ImmutableArray<TextSpan> spans,
         ClassificationOptions options,
@@ -112,42 +111,57 @@ namespace Microsoft.CodeAnalysis.Classification
             if (classificationService == null)
                 return default;
 
-            using var _1 = ArrayBuilder<SegmentedList<ClassifiedSpan>>.GetInstance(out var syntacticSpansArray);
-            using var _2 = ArrayBuilder<SegmentedList<ClassifiedSpan>>.GetInstance(out var semanticSpansArray);
+            using var _1 = ArrayBuilder<PooledObject<SegmentedList<ClassifiedSpan>>>.GetInstance(out var syntacticSpansArray);
+            using var _2 = ArrayBuilder<PooledObject<SegmentedList<ClassifiedSpan>>>.GetInstance(out var semanticSpansArray);
             for (var i = 0; i < spans.Length; i++)
             {
-                var span = spans[i];
-                using var __1 = Classifier.GetPooledList(out var syntaxSpans);
-                await classificationService.AddSyntacticClassificationsAsync(document, span, syntaxSpans, cancellationToken).ConfigureAwait(false);
-                syntacticSpansArray.Add(syntaxSpans);
+                syntacticSpansArray[i] = Classifier.GetPooledList(out _);
+                semanticSpansArray[i] = Classifier.GetPooledList(out _);
             }
 
-            await classificationService.AddSemanticClassificationsAsync(document, spans, options, semanticSpansArray, cancellationToken).ConfigureAwait(false);
-            for (var i = 0; i < spans.Length; i++)
+            try
             {
-                var span = spans[i];
-                using var __2 = Classifier.GetPooledList(out var semanticSpans);
-                await classificationService.AddEmbeddedLanguageClassificationsAsync(document, span, options, semanticSpans, cancellationToken).ConfigureAwait(false);
-                semanticSpansArray.Add(semanticSpans);
-            }
-
-            using var _3 = ArrayBuilder<ImmutableArray<ClassifiedSpan>>.GetInstance(out var classifiedSpans);
-            for (var i = 0; i < spans.Length; i++)
-            {
-                var span = spans[i];
-                var syntaxSpans = syntacticSpansArray[i];
-                var semanticSpans = semanticSpansArray[i];
-
-                if (!includeAdditiveSpans)
+                for (var i = 0; i < spans.Length; i++)
                 {
-                    RemoveAdditiveSpans(syntaxSpans);
-                    RemoveAdditiveSpans(semanticSpans);
+                    var span = spans[i];
+                    await classificationService.AddSyntacticClassificationsAsync(document, span, syntacticSpansArray[i].Object, cancellationToken).ConfigureAwait(false);
+                    syntacticSpansArray.Add(syntacticSpansArray[i]);
                 }
 
-                classifiedSpans.Add(MergeClassifiedSpans(syntaxSpans, semanticSpans, span));
-            }
+                await classificationService.AddSemanticClassificationsAsync(document, spans, options, semanticSpansArray, cancellationToken).ConfigureAwait(false);
+                for (var i = 0; i < spans.Length; i++)
+                {
+                    var span = spans[i];
+                    await classificationService.AddEmbeddedLanguageClassificationsAsync(document, span, options, syntacticSpansArray[i].Object, cancellationToken).ConfigureAwait(false);
+                    semanticSpansArray.Add(semanticSpansArray[i]);
+                }
 
-            return classifiedSpans;
+                using var _3 = ArrayBuilder<ImmutableArray<ClassifiedSpan>>.GetInstance(out var classifiedSpans);
+                for (var i = 0; i < spans.Length; i++)
+                {
+                    var span = spans[i];
+                    var syntaxSpans = syntacticSpansArray[i];
+                    var semanticSpans = semanticSpansArray[i];
+
+                    if (!includeAdditiveSpans)
+                    {
+                        RemoveAdditiveSpans(syntaxSpans.Object);
+                        RemoveAdditiveSpans(semanticSpans.Object);
+                    }
+
+                    classifiedSpans.Add(MergeClassifiedSpans(syntaxSpans.Object, semanticSpans.Object, span));
+                }
+
+                return classifiedSpans.ToImmutableAndClear();
+            }
+            finally
+            {
+                for (var i = 0; i < spans.Length; i++)
+                {
+                    syntacticSpansArray[i].Dispose();
+                    semanticSpansArray[i].Dispose();
+                }
+            }
         }
 
         private static void RemoveAdditiveSpans(SegmentedList<ClassifiedSpan> spans)

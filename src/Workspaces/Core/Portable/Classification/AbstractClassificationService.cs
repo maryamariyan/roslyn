@@ -38,7 +38,7 @@ namespace Microsoft.CodeAnalysis.Classification
         }
 
         public Task AddSemanticClassificationsAsync(
-            Document document, ImmutableArray<TextSpan> textSpans, ClassificationOptions options, ArrayBuilder<SegmentedList<ClassifiedSpan>> result, CancellationToken cancellationToken)
+            Document document, ImmutableArray<TextSpan> textSpans, ClassificationOptions options, ArrayBuilder<PooledObject<SegmentedList<ClassifiedSpan>>> result, CancellationToken cancellationToken)
         {
             return Task.CompletedTask;
         }

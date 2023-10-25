@@ -35,7 +35,7 @@ namespace Microsoft.CodeAnalysis.Classification
             ClassificationOptions options,
             Func<SyntaxNode, ImmutableArray<ISyntaxClassifier>> getNodeClassifiers,
             Func<SyntaxToken, ImmutableArray<ISyntaxClassifier>> getTokenClassifiers,
-            ArrayBuilder<SegmentedList<ClassifiedSpan>> result,
+            ArrayBuilder<PooledObject<SegmentedList<ClassifiedSpan>>> result,
             CancellationToken cancellationToken)
         {
             try
@@ -43,9 +43,7 @@ namespace Microsoft.CodeAnalysis.Classification
                 var semanticModel = await document.GetRequiredSemanticModelAsync(cancellationToken).ConfigureAwait(false);
                 for (var i = 0; i < textSpans.Length; i++)
                 {
-                    using var _1 = Classifier.GetPooledList(out var semanticSpans);
-                    AddSemanticClassifications(semanticModel, textSpans[i], getNodeClassifiers, getTokenClassifiers, semanticSpans, options, cancellationToken);
-                    result.Add(semanticSpans);
+                    AddSemanticClassifications(semanticModel, textSpans[i], getNodeClassifiers, getTokenClassifiers, result[i].Object, options, cancellationToken);
                 }
             }
             catch (Exception e) when (FatalError.ReportAndPropagateUnlessCanceled(e, cancellationToken))

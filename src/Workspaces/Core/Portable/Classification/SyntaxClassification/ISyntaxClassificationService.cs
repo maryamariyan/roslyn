@@ -37,7 +37,7 @@ namespace Microsoft.CodeAnalysis.Classification
             ClassificationOptions options,
             Func<SyntaxNode, ImmutableArray<ISyntaxClassifier>> getNodeClassifiers,
             Func<SyntaxToken, ImmutableArray<ISyntaxClassifier>> getTokenClassifiers,
-            ArrayBuilder<SegmentedList<ClassifiedSpan>> result,
+            ArrayBuilder<PooledObject<SegmentedList<ClassifiedSpan>>> result,
             CancellationToken cancellationToken);
 
         /// <inheritdoc cref="IClassificationService.ToBeRemovedAsync"/>
