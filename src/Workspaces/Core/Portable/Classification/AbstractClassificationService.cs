@@ -40,17 +40,16 @@ namespace Microsoft.CodeAnalysis.Classification
         public Task AddSemanticClassificationsAsync(
             Document document, ImmutableArray<TextSpan> textSpans, ClassificationOptions options, ArrayBuilder<PooledObject<SegmentedList<ClassifiedSpan>>> result, CancellationToken cancellationToken)
         {
-            // TODO caching
-            return AddNewClassificationsAsync(document, textSpans, options, ClassificationType.Semantic, result, cancellationToken);
+            return AddClassificationsInCurrentProcessAsync(document, textSpans, options, ClassificationType.Semantic, result, cancellationToken);
         }
+
         public Task AddEmbeddedLanguageClassificationsAsync(
             Document document, ImmutableArray<TextSpan> textSpans, ClassificationOptions options, ArrayBuilder<PooledObject<SegmentedList<ClassifiedSpan>>> result, CancellationToken cancellationToken)
         {
-            // TODO caching
-            return AddNewClassificationsAsync(document, textSpans, options, ClassificationType.EmbeddedLanguage, result, cancellationToken);
+            return AddClassificationsInCurrentProcessAsync(document, textSpans, options, ClassificationType.EmbeddedLanguage, result, cancellationToken);
         }
 
-        private static async Task AddNewClassificationsAsync(
+        private static async Task AddClassificationsInCurrentProcessAsync(
             Document document,
             ImmutableArray<TextSpan> textSpans,
             ClassificationOptions options,
@@ -58,9 +57,14 @@ namespace Microsoft.CodeAnalysis.Classification
             ArrayBuilder<PooledObject<SegmentedList<ClassifiedSpan>>> result,
             CancellationToken cancellationToken)
         {
+            var classificationService = document.GetLanguageService<ISyntaxClassificationService>();
+            if (classificationService == null)
+            {
+                return;
+            }
+
             if (type == ClassificationType.Semantic)
             {
-                var classificationService = document.GetRequiredLanguageService<ISyntaxClassificationService>();
                 var reassignedVariableService = document.GetRequiredLanguageService<IReassignedVariableService>();
 
                 var extensionManager = document.Project.Solution.Services.GetRequiredService<IExtensionManager>();
@@ -77,9 +81,10 @@ namespace Microsoft.CodeAnalysis.Classification
                     for (var i = 0; i < textSpans.Length; i++)
                     {
                         var textSpan = textSpans[i];
+                        var classifiedSpans = result[i].Object;
                         var reassignedVariableSpans = await reassignedVariableService.GetLocationsAsync(document, textSpan, cancellationToken).ConfigureAwait(false);
                         foreach (var span in reassignedVariableSpans)
-                            result[i].Object.Add(new ClassifiedSpan(span, ClassificationTypeNames.ReassignedVariable));
+                            classifiedSpans.Add(new ClassifiedSpan(span, ClassificationTypeNames.ReassignedVariable));
                     }
                 }
             }
