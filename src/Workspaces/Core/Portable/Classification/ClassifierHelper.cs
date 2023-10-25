@@ -115,8 +115,8 @@ namespace Microsoft.CodeAnalysis.Classification
             using var _2 = ArrayBuilder<PooledObject<SegmentedList<ClassifiedSpan>>>.GetInstance(out var semanticSpansArray);
             for (var i = 0; i < spans.Length; i++)
             {
-                syntacticSpansArray[i] = Classifier.GetPooledList(out _);
-                semanticSpansArray[i] = Classifier.GetPooledList(out _);
+                syntacticSpansArray.Add(Classifier.GetPooledList(out _));
+                semanticSpansArray.Add(Classifier.GetPooledList(out _));
             }
 
             try

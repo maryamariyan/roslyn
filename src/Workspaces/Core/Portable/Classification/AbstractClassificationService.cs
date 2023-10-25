@@ -40,7 +40,14 @@ namespace Microsoft.CodeAnalysis.Classification
         public Task AddSemanticClassificationsAsync(
             Document document, ImmutableArray<TextSpan> textSpans, ClassificationOptions options, ArrayBuilder<PooledObject<SegmentedList<ClassifiedSpan>>> result, CancellationToken cancellationToken)
         {
-            return Task.CompletedTask;
+            return Task.Run(async () =>
+            {
+                for (var i = 0; i < textSpans.Length; i++)
+                {
+                    await AddClassificationsAsync(document, textSpans[i], options, ClassificationType.Semantic, result[i].Object, cancellationToken)
+                        .ConfigureAwait(false);
+                }
+            }, cancellationToken);
         }
 
         private static async Task AddClassificationsAsync(
@@ -129,21 +136,22 @@ namespace Microsoft.CodeAnalysis.Classification
             if (isFullyLoaded)
                 return false;
 
-            var (documentKey, checksum) = await SemanticClassificationCacheUtilities.GetDocumentKeyAndChecksumAsync(
+            var (_, _) = await SemanticClassificationCacheUtilities.GetDocumentKeyAndChecksumAsync(
                 document, cancellationToken).ConfigureAwait(false);
 
-            var cachedSpans = await client.TryInvokeAsync<IRemoteSemanticClassificationService, SerializableClassifiedSpans?>(
-               document.Project,
-               (service, solutionInfo, cancellationToken) => service.GetCachedClassificationsAsync(
-                   documentKey, textSpan, type, checksum, cancellationToken),
-               cancellationToken).ConfigureAwait(false);
+            return false;
+            //var cachedSpans = await client.TryInvokeAsync<IRemoteSemanticClassificationService, SerializableClassifiedSpans?>(
+            //   document.Project,
+            //   (service, solutionInfo, cancellationToken) => service.GetCachedClassificationsAsync(
+            //       documentKey, textSpan, type, checksum, cancellationToken),
+            //   cancellationToken).ConfigureAwait(false);
 
-            // if the remote call fails do nothing (error has already been reported)
-            if (!cachedSpans.HasValue || cachedSpans.Value == null)
-                return false;
+            //// if the remote call fails do nothing (error has already been reported)
+            //if (!cachedSpans.HasValue || cachedSpans.Value == null)
+            //    return false;
 
-            cachedSpans.Value.Rehydrate(result);
-            return true;
+            //cachedSpans.Value.Rehydrate(result);
+            //return true;
         }
 
         public static async Task AddClassificationsInCurrentProcessAsync(
