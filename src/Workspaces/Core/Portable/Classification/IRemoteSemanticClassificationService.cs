@@ -17,12 +17,13 @@ namespace Microsoft.CodeAnalysis.Classification
 {
     internal interface IRemoteSemanticClassificationService
     {
-        ValueTask<SerializableClassifiedSpans> GetClassificationsAsync(
+        ValueTask<SerializableClassifiedSpans[]> GetClassificationsAsync(
             Checksum solutionChecksum,
             DocumentId documentId,
-            TextSpan span,
+            ImmutableArray<TextSpan> textSpans,
             ClassificationType type,
             ClassificationOptions options,
+            ArrayBuilder<PooledObject<SegmentedList<ClassifiedSpan>>> result,
             bool isFullyLoaded,
             CancellationToken cancellationToken);
 

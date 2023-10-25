@@ -6,6 +6,8 @@ using System.Collections.Immutable;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.Classification;
+using Microsoft.CodeAnalysis.Collections;
+using Microsoft.CodeAnalysis.PooledObjects;
 using Microsoft.CodeAnalysis.Text;
 using Roslyn.Utilities;
 
@@ -19,12 +21,13 @@ namespace Microsoft.CodeAnalysis.Remote
                 => new RemoteSemanticClassificationService(arguments);
         }
 
-        public ValueTask<SerializableClassifiedSpans> GetClassificationsAsync(
+        public ValueTask<SerializableClassifiedSpans[]> GetClassificationsAsync(
             Checksum solutionChecksum,
             DocumentId documentId,
-            TextSpan span,
+            ImmutableArray<TextSpan> spans,
             ClassificationType type,
             ClassificationOptions options,
+            ArrayBuilder<PooledObject<SegmentedList<ClassifiedSpan>>> result,
             bool isFullyLoaded,
             CancellationToken cancellationToken)
         {
@@ -39,9 +42,8 @@ namespace Microsoft.CodeAnalysis.Remote
                     document = document.WithFrozenPartialSemantics(cancellationToken);
                 }
 
-                using var _ = Classifier.GetPooledList(out var temp);
                 await AbstractClassificationService.AddClassificationsInCurrentProcessAsync(
-                    document, span, type, options, temp, cancellationToken).ConfigureAwait(false);
+                    document, spans, options, type, result, cancellationToken).ConfigureAwait(false);
 
                 if (isFullyLoaded)
                 {
@@ -54,7 +56,13 @@ namespace Microsoft.CodeAnalysis.Remote
                     _workQueue.AddWork((document, type, options));
                 }
 
-                return SerializableClassifiedSpans.Dehydrate(temp.ToImmutableArray());
+                var serializableClassifiedSpans = new SerializableClassifiedSpans[spans.Length];
+                for (var i = 0; i < spans.Length; i++)
+                {
+                    SerializableClassifiedSpans.Dehydrate(result[i].Object.ToImmutableArray());
+                }
+
+                return serializableClassifiedSpans;
             }, cancellationToken);
         }
     }

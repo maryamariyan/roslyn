@@ -25,6 +25,7 @@ namespace Microsoft.CodeAnalysis.LanguageServer.Handler.SemanticTokens
     internal class SemanticTokensHelpers
     {
         private static Random s_random = new Random();
+        private static bool s_stopExperiment = true;
         private static List<long> s_old = new List<long>();
         private static List<long> s_new = new List<long>();
 
@@ -87,7 +88,7 @@ namespace Microsoft.CodeAnalysis.LanguageServer.Handler.SemanticTokens
             // We either calculate the tokens for the full document span, or the user 
             // can pass in a range from the full document if they wish.
             ranges ??= new[] { ProtocolConversions.TextSpanToRange(root.FullSpan, text) };
-            if (s_random.Next(2) == 0)
+            if (s_stopExperiment || s_random.Next(2) == 0)
             {
                 var stopwatch = Stopwatch.StartNew();
                 using var _ = ArrayBuilder<TextSpan>.GetInstance(out var textSpans);
