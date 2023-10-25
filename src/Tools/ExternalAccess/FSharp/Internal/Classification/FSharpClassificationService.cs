@@ -5,6 +5,7 @@
 using System;
 using System.Collections.Generic;
 using System.Composition;
+using System.Collections.Immutable;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.Classification;
@@ -38,11 +39,24 @@ namespace Microsoft.CodeAnalysis.ExternalAccess.FSharp.Internal.Classification
             result.AddRange(list);
         }
 
-        public async Task AddSemanticClassificationsAsync(Document document, TextSpan textSpan, ClassificationOptions options, SegmentedList<ClassifiedSpan> result, CancellationToken cancellationToken)
+        public async Task ToBeRemovedAsync(Document document, TextSpan textSpan, ClassificationOptions options, SegmentedList<ClassifiedSpan> result, CancellationToken cancellationToken)
         {
             using var _ = s_listPool.GetPooledObject(out var list);
             await _service.AddSemanticClassificationsAsync(document, textSpan, list, cancellationToken).ConfigureAwait(false);
             result.AddRange(list);
+        }
+
+        public async Task AddSemanticClassificationsAsync(Document document, ImmutableArray<TextSpan> textSpans, ClassificationOptions options, ArrayBuilder<SegmentedList<ClassifiedSpan>> result, CancellationToken cancellationToken)
+        {
+            using var _1 = Classifier.GetPooledList(out var semanticSpans);
+            using var _2 = ArrayBuilder<SegmentedList<ClassifiedSpan>>.GetInstance(out var semanticSpansArray);
+
+            for (var i = 0; i < textSpans.Length; i++)
+            {
+                var span = textSpans[i];
+                await ToBeRemovedAsync(document, span, options, semanticSpans, cancellationToken).ConfigureAwait(false);
+                semanticSpansArray.Add(semanticSpans);
+            }
         }
 
         public async Task AddSyntacticClassificationsAsync(Document document, TextSpan textSpan, SegmentedList<ClassifiedSpan> result, CancellationToken cancellationToken)

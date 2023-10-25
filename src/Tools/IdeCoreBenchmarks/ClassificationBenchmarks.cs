@@ -97,7 +97,7 @@ namespace IdeCoreBenchmarks
         {
             var service = document.GetRequiredLanguageService<IClassificationService>();
             using var _ = Classifier.GetPooledList(out var result);
-            await service.AddSemanticClassificationsAsync(document, span, ClassificationOptions.Default, result, CancellationToken.None);
+            await service.ToBeRemovedAsync(document, span, ClassificationOptions.Default, result, CancellationToken.None);
             return result.ToImmutableArray();
         }
 

@@ -195,7 +195,7 @@ namespace Microsoft.CodeAnalysis.Classification
         {
             if (type == ClassificationType.Semantic)
             {
-                await classificationService.AddSemanticClassificationsAsync(
+                await classificationService.ToBeRemovedAsync(
                    document, snapshotSpan.Span.ToTextSpan(), options, classifiedSpans, cancellationToken).ConfigureAwait(false);
             }
             else if (type == ClassificationType.EmbeddedLanguage)
