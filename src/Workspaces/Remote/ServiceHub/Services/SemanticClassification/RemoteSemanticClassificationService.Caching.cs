@@ -89,6 +89,28 @@ namespace Microsoft.CodeAnalysis.Remote
                 : SerializableClassifiedSpans.Dehydrate(classifiedSpans.WhereAsArray(c => c.TextSpan.IntersectsWith(textSpan)));
         }
 
+        public async ValueTask<ArrayBuilder<SerializableClassifiedSpans>?> GetCachedClassificationsAsync(
+            DocumentKey documentKey,
+            ImmutableArray<TextSpan> textSpans,
+            ClassificationType type,
+            Checksum checksum,
+            CancellationToken cancellationToken)
+        {
+            var classifiedSpans = await TryGetOrReadCachedSemanticClassificationsAsync(
+                documentKey, type, checksum, cancellationToken).ConfigureAwait(false);
+
+            if (classifiedSpans.IsDefault)
+                return null;
+
+            using var _ = ArrayBuilder<SerializableClassifiedSpans>.GetInstance(out var serializableSpans);
+            for (var i = 0; i < textSpans.Length; i++)
+            {
+                serializableSpans.Add(SerializableClassifiedSpans.Dehydrate(classifiedSpans.WhereAsArray(c => c.TextSpan.IntersectsWith(textSpans[i]))));
+            }
+
+            return serializableSpans;
+        }
+
         private static async ValueTask CacheClassificationsAsync(
             ImmutableSegmentedList<(Document document, ClassificationType type, ClassificationOptions options)> documents,
             CancellationToken cancellationToken)

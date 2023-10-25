@@ -25,7 +25,7 @@ namespace Microsoft.CodeAnalysis.LanguageServer.Handler.SemanticTokens
     internal class SemanticTokensHelpers
     {
         private static Random s_random = new Random();
-        private static bool s_stopExperiment = true;
+        private static bool s_stopExperiment = false;
         private static List<long> s_old = new List<long>();
         private static List<long> s_new = new List<long>();
 

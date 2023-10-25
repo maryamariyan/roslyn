@@ -49,50 +49,6 @@ namespace Microsoft.CodeAnalysis.Classification
             return AddClassificationsInCurrentProcessAsync(document, textSpans, options, ClassificationType.EmbeddedLanguage, result, cancellationToken);
         }
 
-        private static bool IsFullyLoaded(Document document, CancellationToken cancellationToken)
-        {
-            var workspaceStatusService = document.Project.Solution.Services.GetRequiredService<IWorkspaceStatusService>();
-
-            // Importantly, we do not await/wait on the fullyLoadedStateTask.  We do not want to ever be waiting on work
-            // that may end up touching the UI thread (As we can deadlock if GetTagsSynchronous waits on us).  Instead,
-            // we only check if the Task is completed.  Prior to that we will assume we are still loading.  Once this
-            // task is completed, we know that the WaitUntilFullyLoadedAsync call will have actually finished and we're
-            // fully loaded.
-            var isFullyLoadedTask = workspaceStatusService.IsFullyLoadedAsync(cancellationToken);
-            var isFullyLoaded = isFullyLoadedTask.IsCompleted && isFullyLoadedTask.GetAwaiter().GetResult();
-            return isFullyLoaded;
-        }
-
-        private static async Task<bool> TryGetCachedClassificationsAsync(
-            Document document,
-            TextSpan textSpan,
-            ClassificationType type,
-            RemoteHostClient client,
-            bool isFullyLoaded,
-            SegmentedList<ClassifiedSpan> result,
-            CancellationToken cancellationToken)
-        {
-            // Only try to get cached classifications if we're not fully loaded yet.
-            if (isFullyLoaded)
-                return false;
-
-            var (documentKey, checksum) = await SemanticClassificationCacheUtilities.GetDocumentKeyAndChecksumAsync(
-                document, cancellationToken).ConfigureAwait(false);
-
-            var cachedSpans = await client.TryInvokeAsync<IRemoteSemanticClassificationService, SerializableClassifiedSpans?>(
-               document.Project,
-               (service, solutionInfo, cancellationToken) => service.GetCachedClassificationsAsync(
-                   documentKey, textSpan, type, checksum, cancellationToken),
-               cancellationToken).ConfigureAwait(false);
-
-            // if the remote call fails do nothing (error has already been reported)
-            if (!cachedSpans.HasValue || cachedSpans.Value == null)
-                return false;
-
-            cachedSpans.Value.Rehydrate(result);
-            return true;
-        }
-
         public static async Task AddClassificationsInCurrentProcessAsync(
             Document document,
             ImmutableArray<TextSpan> textSpans,
@@ -115,28 +71,23 @@ namespace Microsoft.CodeAnalysis.Classification
                 // service.GetSemanticClassificationsAsync below) as we want to try to read in the cached
                 // classifications without doing any syncing to the OOP process.
                 var isFullyLoaded = IsFullyLoaded(document, cancellationToken);
-                for (var i = 0; i < textSpans.Length; i++)
+                if (await TryGetCachedClassificationsAsync(document, textSpans, type, client, isFullyLoaded, result, cancellationToken).ConfigureAwait(false))
+                    return;
+
+                // Call the project overload.  Semantic classification only needs the current project's information
+                // to classify properly.
+                var classifiedSpans = await client.TryInvokeAsync<IRemoteSemanticClassificationService, ArrayBuilder<SerializableClassifiedSpans>>(
+                   document.Project,
+                   (service, solutionInfo, cancellationToken) => service.GetClassificationsAsync(
+                       solutionInfo, document.Id, textSpans, type, options, result, isFullyLoaded, cancellationToken),
+                   cancellationToken).ConfigureAwait(false);
+
+                // if the remote call fails do nothing (error has already been reported)
+                if (classifiedSpans.HasValue)
                 {
-                    var textSpan = textSpans[i];
-                    if (await TryGetCachedClassificationsAsync(document, textSpan, type, client, isFullyLoaded, result[i].Object, cancellationToken).ConfigureAwait(false))
-                        return;
-
-                    // Call the project overload.  Semantic classification only needs the current project's information
-                    // to classify properly.
-                    var classifiedSpans = await client.TryInvokeAsync<IRemoteSemanticClassificationService, SerializableClassifiedSpans[]>(
-                       document.Project,
-                       (service, solutionInfo, cancellationToken) => service.GetClassificationsAsync(
-                           solutionInfo, document.Id, textSpans, type, options, result, isFullyLoaded, cancellationToken),
-                       cancellationToken).ConfigureAwait(false);
-
-                    // if the remote call fails do nothing (error has already been reported)
-                    if (classifiedSpans.HasValue)
+                    for (var i = 0; i < textSpans.Length; i++)
                     {
-                        for (var j = 0; j < classifiedSpans.Value.Length; j++)
-                        {
-                            var curSpan = classifiedSpans.Value[j];
-                            curSpan.Rehydrate(result[i].Object);
-                        }
+                        classifiedSpans.Value[i].Rehydrate(result[i].Object);
                     }
                 }
             }
@@ -183,6 +134,188 @@ namespace Microsoft.CodeAnalysis.Classification
             }
         }
 
+        private static async Task AddClassificationsAsync(
+            Document document,
+            TextSpan textSpan,
+            ClassificationOptions options,
+            ClassificationType type,
+            SegmentedList<ClassifiedSpan> result,
+            CancellationToken cancellationToken)
+        {
+            var classificationService = document.GetLanguageService<ISyntaxClassificationService>();
+            if (classificationService == null)
+            {
+                // When renaming a file's extension through VS when it's opened in editor, 
+                // the content type might change and the content type changed event can be 
+                // raised before the renaming propagate through VS workspace. As a result, 
+                // the document we got (based on the buffer) could still be the one in the workspace
+                // before rename happened. This would cause us problem if the document is supported 
+                // by workspace but not a roslyn language (e.g. xaml, F#, etc.), since none of the roslyn 
+                // language services would be available.
+                //
+                // If this is the case, we will simply bail out. It's OK to ignore the request
+                // because when the buffer eventually get associated with the correct document in roslyn
+                // workspace, we will be invoked again.
+                //
+                // For example, if you open a xaml from from a WPF project in designer view,
+                // and then rename file extension from .xaml to .cs, then the document we received
+                // here would still belong to the special "-xaml" project.
+                return;
+            }
+
+            var client = await RemoteHostClient.TryGetClientAsync(document.Project, cancellationToken).ConfigureAwait(false);
+            if (client != null)
+            {
+                // We have an oop connection.  If we're not fully loaded, see if we can retrieve a previously cached set
+                // of classifications from the server.  Note: this must be a separate call (instead of being part of
+                // service.GetSemanticClassificationsAsync below) as we want to try to read in the cached
+                // classifications without doing any syncing to the OOP process.
+                var isFullyLoaded = IsFullyLoaded(document, cancellationToken);
+                if (await TryGetCachedClassificationsAsync(document, textSpan, type, client, isFullyLoaded, result, cancellationToken).ConfigureAwait(false))
+                    return;
+
+                // Call the project overload.  Semantic classification only needs the current project's information
+                // to classify properly.
+                var classifiedSpans = await client.TryInvokeAsync<IRemoteSemanticClassificationService, SerializableClassifiedSpans>(
+                   document.Project,
+                   (service, solutionInfo, cancellationToken) => service.GetClassificationsAsync(
+                       solutionInfo, document.Id, textSpan, type, options, isFullyLoaded, cancellationToken),
+                   cancellationToken).ConfigureAwait(false);
+
+                // if the remote call fails do nothing (error has already been reported)
+                if (classifiedSpans.HasValue)
+                    classifiedSpans.Value.Rehydrate(result);
+            }
+            else
+            {
+                await AddClassificationsInCurrentProcessAsync(
+                    document, textSpan, type, options, result, cancellationToken).ConfigureAwait(false);
+            }
+        }
+
+        private static bool IsFullyLoaded(Document document, CancellationToken cancellationToken)
+        {
+            var workspaceStatusService = document.Project.Solution.Services.GetRequiredService<IWorkspaceStatusService>();
+
+            // Importantly, we do not await/wait on the fullyLoadedStateTask.  We do not want to ever be waiting on work
+            // that may end up touching the UI thread (As we can deadlock if GetTagsSynchronous waits on us).  Instead,
+            // we only check if the Task is completed.  Prior to that we will assume we are still loading.  Once this
+            // task is completed, we know that the WaitUntilFullyLoadedAsync call will have actually finished and we're
+            // fully loaded.
+            var isFullyLoadedTask = workspaceStatusService.IsFullyLoadedAsync(cancellationToken);
+            var isFullyLoaded = isFullyLoadedTask.IsCompleted && isFullyLoadedTask.GetAwaiter().GetResult();
+            return isFullyLoaded;
+        }
+
+        private static async Task<bool> TryGetCachedClassificationsAsync(
+            Document document,
+            TextSpan textSpan,
+            ClassificationType type,
+            RemoteHostClient client,
+            bool isFullyLoaded,
+            SegmentedList<ClassifiedSpan> result,
+            CancellationToken cancellationToken)
+        {
+            // Only try to get cached classifications if we're not fully loaded yet.
+            if (isFullyLoaded)
+                return false;
+
+            var (documentKey, checksum) = await SemanticClassificationCacheUtilities.GetDocumentKeyAndChecksumAsync(
+                document, cancellationToken).ConfigureAwait(false);
+
+            var cachedSpans = await client.TryInvokeAsync<IRemoteSemanticClassificationService, SerializableClassifiedSpans?>(
+               document.Project,
+               (service, solutionInfo, cancellationToken) => service.GetCachedClassificationsAsync(
+                   documentKey, textSpan, type, checksum, cancellationToken),
+               cancellationToken).ConfigureAwait(false);
+
+            // if the remote call fails do nothing (error has already been reported)
+            if (!cachedSpans.HasValue || cachedSpans.Value == null)
+                return false;
+
+            cachedSpans.Value.Rehydrate(result);
+            return true;
+        }
+
+        private static async Task<bool> TryGetCachedClassificationsAsync(
+            Document document,
+            ImmutableArray<TextSpan> textSpans,
+            ClassificationType type,
+            RemoteHostClient client,
+            bool isFullyLoaded,
+            ArrayBuilder<PooledObject<SegmentedList<ClassifiedSpan>>> result,
+            CancellationToken cancellationToken)
+        {
+            // Only try to get cached classifications if we're not fully loaded yet.
+            if (isFullyLoaded)
+                return false;
+
+            var (documentKey, checksum) = await SemanticClassificationCacheUtilities.GetDocumentKeyAndChecksumAsync(
+                document, cancellationToken).ConfigureAwait(false);
+
+            var cachedSpans = await client.TryInvokeAsync<IRemoteSemanticClassificationService, ArrayBuilder<SerializableClassifiedSpans>?>(
+               document.Project,
+               (service, solutionInfo, cancellationToken) => service.GetCachedClassificationsAsync(
+                   documentKey, textSpans, type, checksum, cancellationToken),
+               cancellationToken).ConfigureAwait(false);
+
+            // if the remote call fails do nothing (error has already been reported)
+            if (!cachedSpans.HasValue || cachedSpans.Value == null)
+                return false;
+
+            var classifiedSpans = cachedSpans.Value;
+            for (var i = 0; i < classifiedSpans.Count; i++)
+            {
+                classifiedSpans[i].Rehydrate(result[i].Object);
+            }
+
+            return true;
+        }
+
+        public static async Task AddClassificationsInCurrentProcessAsync(
+            Document document,
+            TextSpan textSpan,
+            ClassificationType type,
+            ClassificationOptions options,
+            SegmentedList<ClassifiedSpan> result,
+            CancellationToken cancellationToken)
+        {
+            if (type == ClassificationType.Semantic)
+            {
+                var classificationService = document.GetRequiredLanguageService<ISyntaxClassificationService>();
+                var reassignedVariableService = document.GetRequiredLanguageService<IReassignedVariableService>();
+
+                var extensionManager = document.Project.Solution.Services.GetRequiredService<IExtensionManager>();
+                var classifiers = classificationService.GetDefaultSyntaxClassifiers();
+
+                var getNodeClassifiers = extensionManager.CreateNodeExtensionGetter(classifiers, c => c.SyntaxNodeTypes);
+                var getTokenClassifiers = extensionManager.CreateTokenExtensionGetter(classifiers, c => c.SyntaxTokenKinds);
+
+                await classificationService.AddSemanticToBeRemovedAsync(
+                    document, textSpan, options, getNodeClassifiers, getTokenClassifiers, result, cancellationToken).ConfigureAwait(false);
+
+                if (options.ClassifyReassignedVariables)
+                {
+                    var reassignedVariableSpans = await reassignedVariableService.GetLocationsAsync(document, textSpan, cancellationToken).ConfigureAwait(false);
+                    foreach (var span in reassignedVariableSpans)
+                        result.Add(new ClassifiedSpan(span, ClassificationTypeNames.ReassignedVariable));
+                }
+            }
+            else if (type == ClassificationType.EmbeddedLanguage)
+            {
+                var embeddedLanguageService = document.GetLanguageService<IEmbeddedLanguageClassificationService>();
+                if (embeddedLanguageService != null)
+                {
+                    await embeddedLanguageService.AddEmbeddedToBeRemovedAsync(
+                        document, textSpan, options, result, cancellationToken).ConfigureAwait(false);
+                }
+            }
+            else
+            {
+                throw ExceptionUtilities.UnexpectedValue(type);
+            }
+        }
+
         public async Task AddSyntacticClassificationsAsync(Document document, TextSpan textSpan, SegmentedList<ClassifiedSpan> result, CancellationToken cancellationToken)
         {
             var root = await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
@@ -223,25 +356,25 @@ namespace Microsoft.CodeAnalysis.Classification
             return classificationService?.ComputeSyntacticChangeRange(oldRoot, newRoot, timeout, cancellationToken);
         }
 
-        private static Task AddClassificationsAsync(
-            Document document,
-            TextSpan textSpan,
-            ClassificationOptions options,
-            ClassificationType type,
-            SegmentedList<ClassifiedSpan> result,
-            CancellationToken cancellationToken)
-        {
-            using var _1 = ArrayBuilder<PooledObject<SegmentedList<ClassifiedSpan>>>.GetInstance(out var tempArray);
-            using var _2 = ArrayBuilder<TextSpan>.GetInstance(out var textSpans);
-            textSpans.Add(textSpan);
-            tempArray.Add(Classifier.GetPooledList(out _));
-            result = tempArray[0].Object;
-            return Task.Run(async () =>
-            {
-                await AddClassificationsInCurrentProcessAsync(document, textSpans.ToImmutableAndClear(), options, type, tempArray, cancellationToken)
-                    .ConfigureAwait(false);
-                result = tempArray[0].Object;
-            }, cancellationToken);
-        }
+        //private static Task AddClassificationsAsync(
+        //    Document document,
+        //    TextSpan textSpan,
+        //    ClassificationOptions options,
+        //    ClassificationType type,
+        //    SegmentedList<ClassifiedSpan> result,
+        //    CancellationToken cancellationToken)
+        //{
+        //    using var _1 = ArrayBuilder<PooledObject<SegmentedList<ClassifiedSpan>>>.GetInstance(out var tempArray);
+        //    using var _2 = ArrayBuilder<TextSpan>.GetInstance(out var textSpans);
+        //    textSpans.Add(textSpan);
+        //    tempArray.Add(Classifier.GetPooledList(out _));
+        //    result = tempArray[0].Object;
+        //    return Task.Run(async () =>
+        //    {
+        //        await AddClassificationsInCurrentProcessAsync(document, textSpans.ToImmutableAndClear(), options, type, tempArray, cancellationToken)
+        //            .ConfigureAwait(false);
+        //        result = tempArray[0].Object;
+        //    }, cancellationToken);
+        //}
     }
 }
