@@ -4,6 +4,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.Collections;
@@ -35,13 +36,25 @@ namespace Microsoft.CodeAnalysis.Classification
             _fallbackClassifier = fallbackClassifier;
         }
 
-        public async Task AddEmbeddedLanguageClassificationsAsync(
+        public async Task AddEmbeddedToBeRemovedAsync(
             Document document, TextSpan textSpan, ClassificationOptions options, SegmentedList<ClassifiedSpan> result, CancellationToken cancellationToken)
         {
             var semanticModel = await document.GetRequiredSemanticModelAsync(cancellationToken).ConfigureAwait(false);
             var project = document.Project;
             AddEmbeddedLanguageClassifications(
                 project.Solution.Services, project, semanticModel, textSpan, options, result, cancellationToken);
+        }
+
+        public async Task AddEmbeddedLanguageClassificationsAsync(
+            Document document, ImmutableArray<TextSpan> textSpans, ClassificationOptions options, ArrayBuilder<PooledObject<SegmentedList<ClassifiedSpan>>> result, CancellationToken cancellationToken)
+        {
+            var semanticModel = await document.GetRequiredSemanticModelAsync(cancellationToken).ConfigureAwait(false);
+            var project = document.Project;
+            for (var i = 0; i < textSpans.Length; i++)
+            {
+                AddEmbeddedLanguageClassifications(
+                    project.Solution.Services, project, semanticModel, textSpans[i], options, result[i].Object, cancellationToken);
+            }
         }
 
         public void AddEmbeddedLanguageClassifications(

@@ -136,7 +136,7 @@ namespace Microsoft.CodeAnalysis.Remote
 
             // Compute classifications for the full span.
             var text = await document.GetValueTextAsync(cancellationToken).ConfigureAwait(false);
-            await classificationService.ToBeRemovedAsync(document, new TextSpan(0, text.Length), options, classifiedSpans, cancellationToken).ConfigureAwait(false);
+            await classificationService.AddSemanticToBeRemovedAsync(document, new TextSpan(0, text.Length), options, classifiedSpans, cancellationToken).ConfigureAwait(false);
 
             using var stream = SerializableBytes.CreateWritableStream();
             using (var writer = new ObjectWriter(stream, leaveOpen: true, cancellationToken))

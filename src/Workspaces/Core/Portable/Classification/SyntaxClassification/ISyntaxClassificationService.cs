@@ -40,8 +40,8 @@ namespace Microsoft.CodeAnalysis.Classification
             ArrayBuilder<PooledObject<SegmentedList<ClassifiedSpan>>> result,
             CancellationToken cancellationToken);
 
-        /// <inheritdoc cref="IClassificationService.ToBeRemovedAsync"/>
-        Task ToBeRemovedAsync(
+        /// <inheritdoc cref="IClassificationService.AddSemanticToBeRemovedAsync"/>
+        Task AddSemanticToBeRemovedAsync(
             Document document,
             TextSpan textSpan,
             ClassificationOptions options,

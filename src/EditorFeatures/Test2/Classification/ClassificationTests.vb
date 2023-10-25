@@ -331,7 +331,7 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.Classification
                 ' make sure we don't crash with wrong document
                 Dim result = New SegmentedList(Of ClassifiedSpan)()
                 Await classificationService.AddSyntacticClassificationsAsync(wrongDocument, New TextSpan(0, text.Length), result, CancellationToken.None)
-                Await classificationService.ToBeRemovedAsync(wrongDocument, New TextSpan(0, text.Length), options:=Nothing, result, CancellationToken.None)
+                Await classificationService.AddSemanticToBeRemovedAsync(wrongDocument, New TextSpan(0, text.Length), options:=Nothing, result, CancellationToken.None)
             End Using
         End Function
 
@@ -354,7 +354,7 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.Classification
                 Return Task.CompletedTask
             End Function
 
-            Public Function ToBeRemovedAsync(document As Document, textSpan As TextSpan, options As ClassificationOptions, result As SegmentedList(Of ClassifiedSpan), cancellationToken As CancellationToken) As Task Implements IClassificationService.ToBeRemovedAsync
+            Public Function AddSemanticToBeRemovedAsync(document As Document, textSpan As TextSpan, options As ClassificationOptions, result As SegmentedList(Of ClassifiedSpan), cancellationToken As CancellationToken) As Task Implements IClassificationService.AddSemanticToBeRemovedAsync
                 Return Task.CompletedTask
             End Function
 
@@ -373,7 +373,11 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.Classification
                 Return Nothing
             End Function
 
-            Public Function AddEmbeddedLanguageClassificationsAsync(document As Document, textSpan As TextSpan, options As ClassificationOptions, result As SegmentedList(Of ClassifiedSpan), cancellationToken As CancellationToken) As Task Implements IClassificationService.AddEmbeddedLanguageClassificationsAsync
+            Public Function AddEmbeddedLanguageClassificationsAsync(document As Document, textSpans As ImmutableArray(Of TextSpan), options As ClassificationOptions, result As ArrayBuilder(Of PooledObject(Of SegmentedList(Of ClassifiedSpan))), cancellationToken As CancellationToken) As Task Implements IClassificationService.AddEmbeddedLanguageClassificationsAsync
+                Return Task.CompletedTask
+            End Function
+
+            Public Function AddEmbeddedToBeRemovedAsync(document As Document, textSpan As TextSpan, options As ClassificationOptions, result As SegmentedList(Of ClassifiedSpan), cancellationToken As CancellationToken) As Task Implements IClassificationService.AddEmbeddedToBeRemovedAsync
                 Return Task.CompletedTask
             End Function
         End Class

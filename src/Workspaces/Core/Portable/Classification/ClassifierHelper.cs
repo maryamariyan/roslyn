@@ -34,7 +34,7 @@ namespace Microsoft.CodeAnalysis.Classification
         {
             using var _ = ArrayBuilder<ClassifiedSpan>.GetInstance(out var flatten);
             var classifiedSpans = await GetNewClassifiedSpansAsync(document, spans, options, includeAdditiveSpans, cancellationToken).ConfigureAwait(false);
-  
+
             for (var i = 0; i < classifiedSpans.Length; i++)
             {
                 var classifiedSpan = classifiedSpans[i];
@@ -81,8 +81,8 @@ namespace Microsoft.CodeAnalysis.Classification
 
             // Intentional that we're adding both semantic and embedded lang classifications to the same array.  Both
             // are 'semantic' from the perspective of this helper method.
-            await classificationService.ToBeRemovedAsync(document, span, options, semanticSpans, cancellationToken).ConfigureAwait(false);
-            await classificationService.AddEmbeddedLanguageClassificationsAsync(document, span, options, semanticSpans, cancellationToken).ConfigureAwait(false);
+            await classificationService.AddSemanticToBeRemovedAsync(document, span, options, semanticSpans, cancellationToken).ConfigureAwait(false);
+            await classificationService.AddEmbeddedToBeRemovedAsync(document, span, options, semanticSpans, cancellationToken).ConfigureAwait(false);
 
             // MergeClassifiedSpans will ultimately filter multiple classifications for the same
             // span down to one. We know that additive classifications are there just to 
@@ -129,12 +129,7 @@ namespace Microsoft.CodeAnalysis.Classification
                 }
 
                 await classificationService.AddSemanticClassificationsAsync(document, spans, options, semanticSpansArray, cancellationToken).ConfigureAwait(false);
-                for (var i = 0; i < spans.Length; i++)
-                {
-                    var span = spans[i];
-                    await classificationService.AddEmbeddedLanguageClassificationsAsync(document, span, options, syntacticSpansArray[i].Object, cancellationToken).ConfigureAwait(false);
-                    semanticSpansArray.Add(semanticSpansArray[i]);
-                }
+                await classificationService.AddEmbeddedLanguageClassificationsAsync(document, spans, options, semanticSpansArray, cancellationToken).ConfigureAwait(false);
 
                 using var _3 = ArrayBuilder<ImmutableArray<ClassifiedSpan>>.GetInstance(out var classifiedSpans);
                 for (var i = 0; i < spans.Length; i++)

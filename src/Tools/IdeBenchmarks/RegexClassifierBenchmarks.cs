@@ -85,7 +85,7 @@ class Program
 
             using var _ = Classifier.GetPooledList(out var results);
 
-            await service.ToBeRemovedAsync(
+            await service.AddSemanticToBeRemovedAsync(
                 document,
                 span,
                 ClassificationOptions.Default,

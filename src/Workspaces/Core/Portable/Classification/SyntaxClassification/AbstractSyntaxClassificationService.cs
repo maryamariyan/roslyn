@@ -52,7 +52,7 @@ namespace Microsoft.CodeAnalysis.Classification
             }
         }
 
-        public async Task ToBeRemovedAsync(
+        public async Task AddSemanticToBeRemovedAsync(
             Document document,
             TextSpan textSpan,
             ClassificationOptions options,

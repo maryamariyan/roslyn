@@ -54,13 +54,14 @@ namespace Microsoft.CodeAnalysis.Classification
         /// </remarks>
         Task AddSemanticClassificationsAsync(Document document, ImmutableArray<TextSpan> textSpans, ClassificationOptions options, ArrayBuilder<PooledObject<SegmentedList<ClassifiedSpan>>> result, CancellationToken cancellationToken);
 
-        Task ToBeRemovedAsync(Document document, TextSpan textSpan, ClassificationOptions options, SegmentedList<ClassifiedSpan> result, CancellationToken cancellationToken);
+        Task AddSemanticToBeRemovedAsync(Document document, TextSpan textSpan, ClassificationOptions options, SegmentedList<ClassifiedSpan> result, CancellationToken cancellationToken);
 
         /// <summary>
         /// Produce the classifications for embedded language string literals (e.g. Regex/Json strings) in the span of
         /// text specified.
         /// </summary>
-        Task AddEmbeddedLanguageClassificationsAsync(Document document, TextSpan textSpan, ClassificationOptions options, SegmentedList<ClassifiedSpan> result, CancellationToken cancellationToken);
+        Task AddEmbeddedLanguageClassificationsAsync(Document document, ImmutableArray<TextSpan> textSpans, ClassificationOptions options, ArrayBuilder<PooledObject<SegmentedList<ClassifiedSpan>>> result, CancellationToken cancellationToken);
+        Task AddEmbeddedToBeRemovedAsync(Document document, TextSpan textSpan, ClassificationOptions options, SegmentedList<ClassifiedSpan> result, CancellationToken cancellationToken);
 
         /// <summary>
         /// Adjust a classification from a previous version of text accordingly based on the current

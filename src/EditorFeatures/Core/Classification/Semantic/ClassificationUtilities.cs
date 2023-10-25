@@ -195,12 +195,12 @@ namespace Microsoft.CodeAnalysis.Classification
         {
             if (type == ClassificationType.Semantic)
             {
-                await classificationService.ToBeRemovedAsync(
+                await classificationService.AddSemanticToBeRemovedAsync(
                    document, snapshotSpan.Span.ToTextSpan(), options, classifiedSpans, cancellationToken).ConfigureAwait(false);
             }
             else if (type == ClassificationType.EmbeddedLanguage)
             {
-                await classificationService.AddEmbeddedLanguageClassificationsAsync(
+                await classificationService.AddEmbeddedToBeRemovedAsync(
                    document, snapshotSpan.Span.ToTextSpan(), options, classifiedSpans, cancellationToken).ConfigureAwait(false);
             }
             else

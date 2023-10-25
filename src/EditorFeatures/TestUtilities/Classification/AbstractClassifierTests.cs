@@ -274,8 +274,8 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.Classification
             var options = ClassificationOptions.Default;
 
             using var _ = Classifier.GetPooledList(out var result);
-            await service.ToBeRemovedAsync(document, span, options, result, CancellationToken.None);
-            await service.AddEmbeddedLanguageClassificationsAsync(document, span, options, result, CancellationToken.None);
+            await service.AddSemanticToBeRemovedAsync(document, span, options, result, CancellationToken.None);
+            await service.AddEmbeddedToBeRemovedAsync(document, span, options, result, CancellationToken.None);
             return result.ToImmutableArray();
         }
 
