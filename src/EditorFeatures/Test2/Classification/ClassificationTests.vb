@@ -331,7 +331,7 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.Classification
                 ' make sure we don't crash with wrong document
                 Dim result = New SegmentedList(Of ClassifiedSpan)()
                 Await classificationService.AddSyntacticClassificationsAsync(wrongDocument, New TextSpan(0, text.Length), result, CancellationToken.None)
-                Await classificationService.OldAddSemanticClassificationsAsync(wrongDocument, New TextSpan(0, text.Length), options:=Nothing, result, CancellationToken.None)
+                Await classificationService.ToBeRemovedAsync(wrongDocument, New TextSpan(0, text.Length), options:=Nothing, result, CancellationToken.None)
             End Using
         End Function
 
@@ -354,7 +354,7 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.Classification
                 Return Task.CompletedTask
             End Function
 
-            Public Function OldAddSemanticClassificationsAsync(document As Document, textSpan As TextSpan, options As ClassificationOptions, result As SegmentedList(Of ClassifiedSpan), cancellationToken As CancellationToken) As Task Implements IClassificationService.OldAddSemanticClassificationsAsync
+            Public Function ToBeRemovedAsync(document As Document, textSpan As TextSpan, options As ClassificationOptions, result As SegmentedList(Of ClassifiedSpan), cancellationToken As CancellationToken) As Task Implements IClassificationService.ToBeRemovedAsync
                 Return Task.CompletedTask
             End Function
 

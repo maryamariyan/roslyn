@@ -40,8 +40,8 @@ namespace Microsoft.CodeAnalysis.Classification
             ArrayBuilder<SegmentedList<ClassifiedSpan>> result,
             CancellationToken cancellationToken);
 
-        /// <inheritdoc cref="IClassificationService.OldAddSemanticClassificationsAsync"/>
-        Task OldAddSemanticClassificationsAsync(
+        /// <inheritdoc cref="IClassificationService.ToBeRemovedAsync"/>
+        Task ToBeRemovedAsync(
             Document document,
             TextSpan textSpan,
             ClassificationOptions options,

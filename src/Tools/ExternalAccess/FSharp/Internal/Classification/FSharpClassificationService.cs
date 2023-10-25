@@ -39,7 +39,7 @@ namespace Microsoft.CodeAnalysis.ExternalAccess.FSharp.Internal.Classification
             result.AddRange(list);
         }
 
-        public async Task OldAddSemanticClassificationsAsync(Document document, TextSpan textSpan, ClassificationOptions options, SegmentedList<ClassifiedSpan> result, CancellationToken cancellationToken)
+        public async Task ToBeRemovedAsync(Document document, TextSpan textSpan, ClassificationOptions options, SegmentedList<ClassifiedSpan> result, CancellationToken cancellationToken)
         {
             using var _ = s_listPool.GetPooledObject(out var list);
             await _service.AddSemanticClassificationsAsync(document, textSpan, list, cancellationToken).ConfigureAwait(false);
@@ -54,7 +54,7 @@ namespace Microsoft.CodeAnalysis.ExternalAccess.FSharp.Internal.Classification
             for (var i = 0; i < textSpans.Length; i++)
             {
                 var span = textSpans[i];
-                await OldAddSemanticClassificationsAsync(document, span, options, semanticSpanz, cancellationToken).ConfigureAwait(false);
+                await ToBeRemovedAsync(document, span, options, semanticSpanz, cancellationToken).ConfigureAwait(false);
                 semanticSpansArray.Add(semanticSpanz);
             }
         }

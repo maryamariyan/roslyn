@@ -54,7 +54,7 @@ namespace Microsoft.CodeAnalysis.Classification
             }
         }
 
-        public async Task OldAddSemanticClassificationsAsync(
+        public async Task ToBeRemovedAsync(
             Document document,
             TextSpan textSpan,
             ClassificationOptions options,
