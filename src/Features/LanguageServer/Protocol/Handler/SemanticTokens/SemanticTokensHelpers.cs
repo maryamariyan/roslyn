@@ -99,6 +99,7 @@ namespace Microsoft.CodeAnalysis.LanguageServer.Handler.SemanticTokens
                 var stopwatch = Stopwatch.StartNew();
                 await GetClassifiedSpansForDocumentAsync(
                     classifiedSpans, document, textSpans, options, cancellationToken).ConfigureAwait(false);
+                stopwatch.Stop();
                 s_new.Add(stopwatch.ElapsedMilliseconds);
             }
             else
@@ -110,6 +111,7 @@ namespace Microsoft.CodeAnalysis.LanguageServer.Handler.SemanticTokens
                 var stopwatch2 = Stopwatch.StartNew();
                 await GetClassifiedSpansForDocumentAsync(
                     classifiedSpans, document, textSpans, options, cancellationToken).ConfigureAwait(false);
+                stopwatch2.Stop();
                 s_old.Add(stopwatch2.ElapsedMilliseconds);
             }
 
