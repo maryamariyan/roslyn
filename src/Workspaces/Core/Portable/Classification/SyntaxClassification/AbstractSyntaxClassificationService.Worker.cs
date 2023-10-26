@@ -104,10 +104,7 @@ namespace Microsoft.CodeAnalysis.Classification
 
                     if (intervalsThatIntersect.Length > 0)
                     {
-                        foreach (var interval in intervalsThatIntersect)
-                        {
-                            ClassifyNodeOrToken(nodeOrToken, interval);
-                        }
+                        ClassifyNodeOrToken(nodeOrToken, intervalsThatIntersect);
 
                         foreach (var child in nodeOrToken.ChildNodesAndTokens())
                         {
@@ -117,31 +114,35 @@ namespace Microsoft.CodeAnalysis.Classification
                 }
             }
 
-            private void ClassifyNodeOrToken(SyntaxNodeOrToken nodeOrToken, TextSpan textSpan)
+            private void ClassifyNodeOrToken(SyntaxNodeOrToken nodeOrToken, ImmutableArray<TextSpan> textSpans)
             {
                 var node = nodeOrToken.AsNode();
                 if (node != null)
                 {
-                    ClassifyNode(node, textSpan);
+                    ClassifyNode(node, textSpans);
                 }
                 else
                 {
-                    ClassifyToken(nodeOrToken.AsToken(), textSpan);
+                    ClassifyToken(nodeOrToken.AsToken(), textSpans);
                 }
             }
 
-            private void ClassifyNode(SyntaxNode syntax, TextSpan textSpan)
+            private void ClassifyNode(SyntaxNode syntax, ImmutableArray<TextSpan> textSpans)
             {
                 using var obj = s_listPool.GetPooledObject();
                 var list = obj.Object;
+                var classifiers = _getNodeClassifiers(syntax);
 
-                foreach (var classifier in _getNodeClassifiers(syntax))
+                foreach (var textSpan in textSpans)
                 {
-                    _cancellationToken.ThrowIfCancellationRequested();
+                    foreach (var classifier in classifiers)
+                    {
+                        _cancellationToken.ThrowIfCancellationRequested();
 
-                    list.Clear();
-                    classifier.AddClassifications(syntax, textSpan, _semanticModel, _options, list, _cancellationToken);
-                    AddClassifications(list);
+                        list.Clear();
+                        classifier.AddClassifications(syntax, textSpan, _semanticModel, _options, list, _cancellationToken);
+                        AddClassifications(list);
+                    }
                 }
             }
 
@@ -159,23 +160,29 @@ namespace Microsoft.CodeAnalysis.Classification
                 }
             }
 
-            private void ClassifyToken(SyntaxToken syntax, TextSpan textSpan)
+            private void ClassifyToken(SyntaxToken syntax, ImmutableArray<TextSpan> textSpans)
             {
-                ClassifyStructuredTrivia(syntax.LeadingTrivia);
-
-                using var obj = s_listPool.GetPooledObject();
-                var list = obj.Object;
-
-                foreach (var classifier in _getTokenClassifiers(syntax))
+                var leadingTrivia = syntax.LeadingTrivia;
+                var trailingTrivia = syntax.TrailingTrivia;
+                var classifiers = _getTokenClassifiers(syntax);
+                foreach (var textSpan in textSpans)
                 {
-                    _cancellationToken.ThrowIfCancellationRequested();
+                    ClassifyStructuredTrivia(leadingTrivia);
 
-                    list.Clear();
-                    classifier.AddClassifications(syntax, textSpan, _semanticModel, _options, list, _cancellationToken);
-                    AddClassifications(list);
+                    using var obj = s_listPool.GetPooledObject();
+                    var list = obj.Object;
+
+                    foreach (var classifier in classifiers)
+                    {
+                        _cancellationToken.ThrowIfCancellationRequested();
+
+                        list.Clear();
+                        classifier.AddClassifications(syntax, textSpan, _semanticModel, _options, list, _cancellationToken);
+                        AddClassifications(list);
+                    }
+
+                    ClassifyStructuredTrivia(trailingTrivia);
                 }
-
-                ClassifyStructuredTrivia(syntax.TrailingTrivia);
             }
 
             private void ClassifyStructuredTrivia(SyntaxTriviaList triviaList)
