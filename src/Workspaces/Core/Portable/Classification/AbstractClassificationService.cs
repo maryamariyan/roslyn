@@ -163,9 +163,9 @@ namespace Microsoft.CodeAnalysis.Classification
 
                 if (options.ClassifyReassignedVariables)
                 {
-                    for (var i = 0; i < textSpans.Length; i++)
+                    foreach (var textSpan in textSpans)
                     {
-                        var reassignedVariableSpans = await reassignedVariableService.GetLocationsAsync(document, textSpans[i], cancellationToken).ConfigureAwait(false);
+                        var reassignedVariableSpans = await reassignedVariableService.GetLocationsAsync(document, textSpan, cancellationToken).ConfigureAwait(false);
                         foreach (var span in reassignedVariableSpans)
                             result.Add(new ClassifiedSpan(span, ClassificationTypeNames.ReassignedVariable));
                     }

@@ -99,12 +99,11 @@ namespace Microsoft.CodeAnalysis.Classification
                 {
                     _cancellationToken.ThrowIfCancellationRequested();
                     var nodeOrToken = _pendingNodes.Pop();
-
-                    if (_textSpanIntervalTree.HasIntervalThatIntersectsWith(nodeOrToken.FullSpan))
-                    {
-                        var intervalsThatIntersect = _textSpanIntervalTree.GetIntervalsThatIntersectWith(
+                    var intervalsThatIntersect = _textSpanIntervalTree.GetIntervalsThatIntersectWith(
                             nodeOrToken.FullSpan.Start, nodeOrToken.FullSpan.Length);
 
+                    if (intervalsThatIntersect.Length > 0)
+                    {
                         foreach (var interval in intervalsThatIntersect)
                         {
                             ClassifyNodeOrToken(nodeOrToken, interval);
