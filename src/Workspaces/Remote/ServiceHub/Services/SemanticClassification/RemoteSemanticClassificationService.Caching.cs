@@ -89,21 +89,45 @@ namespace Microsoft.CodeAnalysis.Remote
                 : SerializableClassifiedSpans.Dehydrate(classifiedSpans.WhereAsArray(c => c.TextSpan.IntersectsWith(textSpan)));
         }
 
+        public async ValueTask<ArrayBuilder<SerializableClassifiedSpans>?> GetCachedClassificationsAsync(
+            DocumentKey documentKey,
+            ImmutableArray<TextSpan> textSpans,
+            ClassificationType type,
+            Checksum checksum,
+            CancellationToken cancellationToken)
+        {
+            var classifiedSpans = await TryGetOrReadCachedSemanticClassificationsAsync(
+                documentKey, type, checksum, cancellationToken).ConfigureAwait(false);
+
+            if (classifiedSpans.IsDefault)
+                return null;
+
+            using var _ = ArrayBuilder<SerializableClassifiedSpans>.GetInstance(out var serializableSpans);
+            for (var i = 0; i < textSpans.Length; i++)
+            {
+                serializableSpans.Add(SerializableClassifiedSpans.Dehydrate(classifiedSpans.WhereAsArray(c => c.TextSpan.IntersectsWith(textSpans[i]))));
+            }
+
+            return serializableSpans;
+        }
+
         private static async ValueTask CacheClassificationsAsync(
             ImmutableSegmentedList<(Document document, ClassificationType type, ClassificationOptions options)> documents,
             CancellationToken cancellationToken)
         {
-            // Group all the requests by document (as we may have gotten many requests for the same document). Then,
-            // only process the last document from each group (we don't need to bother stale versions of a particular
-            // document).
-            var groups = documents.GroupBy(d => d.document.Id);
-            var tasks = groups.Select(g => Task.Run(() =>
+            // First group by type.  That way we process the last semantic and last embedded-lang classifications per document.
+            foreach (var typeGroup in documents.GroupBy(t => t.type))
             {
-                var (document, type, options) = g.Last();
-                return CacheClassificationsAsync(document, type, options, cancellationToken);
-            }, cancellationToken));
-
-            await Task.WhenAll(tasks).ConfigureAwait(false);
+                // Then, group all those requests by document (as we may have gotten many requests for the same
+                // document). Then, only process the last document from each group (we don't need to bother stale
+                // versions of a particular document).
+                foreach (var group in typeGroup.GroupBy(d => d.document.Id))
+                {
+                    var (document, type, options) = group.Last();
+                    await CacheClassificationsAsync(
+                        document, type, options, cancellationToken).ConfigureAwait(false);
+                }
+            }
         }
 
         private static async Task CacheClassificationsAsync(
@@ -136,7 +160,7 @@ namespace Microsoft.CodeAnalysis.Remote
 
             // Compute classifications for the full span.
             var text = await document.GetValueTextAsync(cancellationToken).ConfigureAwait(false);
-            await classificationService.AddSemanticClassificationsAsync(document, new TextSpan(0, text.Length), options, classifiedSpans, cancellationToken).ConfigureAwait(false);
+            await classificationService.AddSemanticToBeRemovedAsync(document, new TextSpan(0, text.Length), options, classifiedSpans, cancellationToken).ConfigureAwait(false);
 
             using var stream = SerializableBytes.CreateWritableStream();
             using (var writer = new ObjectWriter(stream, leaveOpen: true, cancellationToken))

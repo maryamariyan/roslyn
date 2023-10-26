@@ -6,8 +6,8 @@ using System.Collections.Immutable;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.Classification;
+using Microsoft.CodeAnalysis.Collections;
 using Microsoft.CodeAnalysis.PooledObjects;
-using Microsoft.CodeAnalysis.Storage;
 using Microsoft.CodeAnalysis.Text;
 using Roslyn.Utilities;
 
@@ -19,6 +19,51 @@ namespace Microsoft.CodeAnalysis.Remote
         {
             protected override IRemoteSemanticClassificationService CreateService(in ServiceConstructionArguments arguments)
                 => new RemoteSemanticClassificationService(arguments);
+        }
+
+        public ValueTask<ArrayBuilder<SerializableClassifiedSpans>> GetClassificationsAsync(
+            Checksum solutionChecksum,
+            DocumentId documentId,
+            ImmutableArray<TextSpan> spans,
+            ClassificationType type,
+            ClassificationOptions options,
+            ArrayBuilder<PooledObject<SegmentedList<ClassifiedSpan>>> result,
+            bool isFullyLoaded,
+            CancellationToken cancellationToken)
+        {
+            return RunServiceAsync(solutionChecksum, async solution =>
+            {
+                var document = solution.GetDocument(documentId) ?? await solution.GetSourceGeneratedDocumentAsync(documentId, cancellationToken).ConfigureAwait(false);
+                Contract.ThrowIfNull(document);
+
+                if (options.ForceFrozenPartialSemanticsForCrossProcessOperations)
+                {
+                    // Frozen partial semantics is not automatically passed to OOP, so enable it explicitly when desired
+                    document = document.WithFrozenPartialSemantics(cancellationToken);
+                }
+
+                await AbstractClassificationService.AddClassificationsInCurrentProcessAsync(
+                    document, spans, options, type, result, cancellationToken).ConfigureAwait(false);
+
+                if (isFullyLoaded)
+                {
+                    // Once fully loaded, there's no need for us to keep around any of the data we cached in-memory
+                    // during the time the solution was loading.
+                    lock (_cachedData)
+                        _cachedData.Clear();
+
+                    // Enqueue this document into our work queue to fully classify and cache.
+                    _workQueue.AddWork((document, type, options));
+                }
+
+                using var _ = ArrayBuilder<SerializableClassifiedSpans>.GetInstance(out var serializableSpans);
+                for (var i = 0; i < spans.Length; i++)
+                {
+                    serializableSpans.Add(SerializableClassifiedSpans.Dehydrate(result[i].Object.ToImmutableArray()));
+                }
+
+                return serializableSpans;
+            }, cancellationToken);
         }
 
         public ValueTask<SerializableClassifiedSpans> GetClassificationsAsync(

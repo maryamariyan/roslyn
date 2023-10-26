@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.Classification.Classifiers;
 using Microsoft.CodeAnalysis.Collections;
 using Microsoft.CodeAnalysis.Host;
+using Microsoft.CodeAnalysis.PooledObjects;
 using Microsoft.CodeAnalysis.Text;
 
 namespace Microsoft.CodeAnalysis.Classification
@@ -30,8 +31,17 @@ namespace Microsoft.CodeAnalysis.Classification
             SegmentedList<ClassifiedSpan> result,
             CancellationToken cancellationToken);
 
-        /// <inheritdoc cref="IClassificationService.AddSemanticClassificationsAsync"/>
         Task AddSemanticClassificationsAsync(
+            Document document,
+            ImmutableArray<TextSpan> textSpans,
+            ClassificationOptions options,
+            Func<SyntaxNode, ImmutableArray<ISyntaxClassifier>> getNodeClassifiers,
+            Func<SyntaxToken, ImmutableArray<ISyntaxClassifier>> getTokenClassifiers,
+            ArrayBuilder<PooledObject<SegmentedList<ClassifiedSpan>>> result,
+            CancellationToken cancellationToken);
+
+        /// <inheritdoc cref="IClassificationService.AddSemanticToBeRemovedAsync"/>
+        Task AddSemanticToBeRemovedAsync(
             Document document,
             TextSpan textSpan,
             ClassificationOptions options,

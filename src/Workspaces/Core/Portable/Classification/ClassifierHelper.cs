@@ -8,6 +8,7 @@ using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.Collections;
+using Microsoft.CodeAnalysis.PooledObjects;
 using Microsoft.CodeAnalysis.Shared.Collections;
 using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.CodeAnalysis.Text;
@@ -17,7 +18,7 @@ namespace Microsoft.CodeAnalysis.Classification
     internal static partial class ClassifierHelper
     {
         /// <summary>
-        /// Classifies the provided <paramref name="span"/> in the given <paramref name="document"/>. This will do this
+        /// Classifies the provided <paramref name="spans"/> in the given <paramref name="document"/>. This will do this
         /// using an appropriate <see cref="IClassificationService"/> if that can be found.  <see
         /// cref="ImmutableArray{T}.IsDefault"/> will be returned if this fails.
         /// </summary>
@@ -26,11 +27,42 @@ namespace Microsoft.CodeAnalysis.Classification
         /// overwritten'.  i.e. they add additional information to a previous classification.</param>
         public static async Task<ImmutableArray<ClassifiedSpan>> GetClassifiedSpansAsync(
             Document document,
-            TextSpan span,
+            ImmutableArray<TextSpan> spans,
             ClassificationOptions options,
             bool includeAdditiveSpans,
             CancellationToken cancellationToken)
         {
+            using var _ = ArrayBuilder<ClassifiedSpan>.GetInstance(out var flatten);
+            var classifiedSpans = await GetNewClassifiedSpansAsync(document, spans, options, includeAdditiveSpans, cancellationToken).ConfigureAwait(false);
+
+            for (var i = 0; i < classifiedSpans.Length; i++)
+            {
+                var classifiedSpan = classifiedSpans[i];
+                for (var j = 0; j < classifiedSpan.Length; j++)
+                {
+                    flatten.Add(classifiedSpan[j]);
+                }
+            }
+
+            return flatten.ToImmutableAndClear();
+        }
+
+        /// <summary>
+        /// Classifies the provided <paramref name="span"/> in the given <paramref name="document"/>. This will do this
+        /// using an appropriate <see cref="IClassificationService"/> if that can be found.  <see
+        /// cref="ImmutableArray{T}.IsDefault"/> will be returned if this fails.
+        /// </summary>
+        /// <param name="includeAdditiveSpans">Whether or not 'additive' classification spans are included in the
+        /// results or not.  'Additive' spans are things like 'this variable is static' or 'this variable is
+        /// overwritten'.  i.e. they add additional information to a previous classification.</param>
+        public static async Task<ImmutableArray<ClassifiedSpan>> GetClassifiedSpansAsync(
+        Document document,
+        TextSpan span,
+        ClassificationOptions options,
+        bool includeAdditiveSpans,
+        CancellationToken cancellationToken)
+        {
+            // TODO remove in favor of the one below
             var classificationService = document.GetLanguageService<IClassificationService>();
             if (classificationService == null)
                 return default;
@@ -49,8 +81,8 @@ namespace Microsoft.CodeAnalysis.Classification
 
             // Intentional that we're adding both semantic and embedded lang classifications to the same array.  Both
             // are 'semantic' from the perspective of this helper method.
-            await classificationService.AddSemanticClassificationsAsync(document, span, options, semanticSpans, cancellationToken).ConfigureAwait(false);
-            await classificationService.AddEmbeddedLanguageClassificationsAsync(document, span, options, semanticSpans, cancellationToken).ConfigureAwait(false);
+            await classificationService.AddSemanticToBeRemovedAsync(document, span, options, semanticSpans, cancellationToken).ConfigureAwait(false);
+            await classificationService.AddEmbeddedToBeRemovedAsync(document, span, options, semanticSpans, cancellationToken).ConfigureAwait(false);
 
             // MergeClassifiedSpans will ultimately filter multiple classifications for the same
             // span down to one. We know that additive classifications are there just to 
@@ -66,6 +98,65 @@ namespace Microsoft.CodeAnalysis.Classification
 
             var classifiedSpans = MergeClassifiedSpans(syntaxSpans, semanticSpans, span);
             return classifiedSpans;
+        }
+
+        public static async Task<ImmutableArray<ImmutableArray<ClassifiedSpan>>> GetNewClassifiedSpansAsync(
+        Document document,
+        ImmutableArray<TextSpan> spans,
+        ClassificationOptions options,
+        bool includeAdditiveSpans,
+        CancellationToken cancellationToken)
+        {
+            var classificationService = document.GetLanguageService<IClassificationService>();
+            if (classificationService == null)
+                return default;
+
+            using var _1 = ArrayBuilder<PooledObject<SegmentedList<ClassifiedSpan>>>.GetInstance(out var syntacticSpansArray);
+            using var _2 = ArrayBuilder<PooledObject<SegmentedList<ClassifiedSpan>>>.GetInstance(out var semanticSpansArray);
+            for (var i = 0; i < spans.Length; i++)
+            {
+                syntacticSpansArray.Add(Classifier.GetPooledList(out _));
+                semanticSpansArray.Add(Classifier.GetPooledList(out _));
+            }
+
+            try
+            {
+                for (var i = 0; i < spans.Length; i++)
+                {
+                    var span = spans[i];
+                    await classificationService.AddSyntacticClassificationsAsync(document, span, syntacticSpansArray[i].Object, cancellationToken).ConfigureAwait(false);
+                    syntacticSpansArray.Add(syntacticSpansArray[i]);
+                }
+
+                await classificationService.AddSemanticClassificationsAsync(document, spans, options, semanticSpansArray, cancellationToken).ConfigureAwait(false);
+                await classificationService.AddEmbeddedLanguageClassificationsAsync(document, spans, options, semanticSpansArray, cancellationToken).ConfigureAwait(false);
+
+                using var _3 = ArrayBuilder<ImmutableArray<ClassifiedSpan>>.GetInstance(out var classifiedSpans);
+                for (var i = 0; i < spans.Length; i++)
+                {
+                    var span = spans[i];
+                    var syntaxSpans = syntacticSpansArray[i];
+                    var semanticSpans = semanticSpansArray[i];
+
+                    if (!includeAdditiveSpans)
+                    {
+                        RemoveAdditiveSpans(syntaxSpans.Object);
+                        RemoveAdditiveSpans(semanticSpans.Object);
+                    }
+
+                    classifiedSpans.Add(MergeClassifiedSpans(syntaxSpans.Object, semanticSpans.Object, span));
+                }
+
+                return classifiedSpans.ToImmutableAndClear();
+            }
+            finally
+            {
+                for (var i = 0; i < spans.Length; i++)
+                {
+                    syntacticSpansArray[i].Dispose();
+                    semanticSpansArray[i].Dispose();
+                }
+            }
         }
 
         private static void RemoveAdditiveSpans(SegmentedList<ClassifiedSpan> spans)

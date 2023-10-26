@@ -2,6 +2,7 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System.Collections.Immutable;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.Collections;
@@ -13,11 +14,18 @@ namespace Microsoft.CodeAnalysis.Classification
 {
     internal interface IEmbeddedLanguageClassificationService : ILanguageService
     {
-        Task AddEmbeddedLanguageClassificationsAsync(
+        Task AddEmbeddedToBeRemovedAsync(
             Document document,
             TextSpan textSpan,
             ClassificationOptions options,
             SegmentedList<ClassifiedSpan> result,
+            CancellationToken cancellationToken);
+
+        Task AddEmbeddedLanguageClassificationsAsync(
+            Document document,
+            ImmutableArray<TextSpan> textSpans,
+            ClassificationOptions options,
+            ArrayBuilder<PooledObject<SegmentedList<ClassifiedSpan>>> result,
             CancellationToken cancellationToken);
 
         void AddEmbeddedLanguageClassifications(
