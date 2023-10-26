@@ -4,13 +4,14 @@
 
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.Collections;
 using Microsoft.CodeAnalysis.EmbeddedLanguages;
 using Microsoft.CodeAnalysis.Host;
 using Microsoft.CodeAnalysis.LanguageService;
-using Microsoft.CodeAnalysis.PooledObjects;
+using Microsoft.CodeAnalysis.Shared.Collections;
 using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.CodeAnalysis.Text;
 
@@ -36,22 +37,22 @@ namespace Microsoft.CodeAnalysis.Classification
         }
 
         public async Task AddEmbeddedLanguageClassificationsAsync(
-            Document document, TextSpan textSpan, ClassificationOptions options, SegmentedList<ClassifiedSpan> result, CancellationToken cancellationToken)
+            Document document, TextSpan[] textSpans, ClassificationOptions options, SegmentedList<ClassifiedSpan> result, CancellationToken cancellationToken)
         {
             var semanticModel = await document.GetRequiredSemanticModelAsync(cancellationToken).ConfigureAwait(false);
             var project = document.Project;
             AddEmbeddedLanguageClassifications(
-                project.Solution.Services, project, semanticModel, textSpan, options, result, cancellationToken);
+                project.Solution.Services, project, semanticModel, textSpans, options, result, cancellationToken);
         }
 
         public void AddEmbeddedLanguageClassifications(
-            SolutionServices services, Project? project, SemanticModel semanticModel, TextSpan textSpan, ClassificationOptions options, SegmentedList<ClassifiedSpan> result, CancellationToken cancellationToken)
+            SolutionServices services, Project? project, SemanticModel semanticModel, TextSpan[] textSpans, ClassificationOptions options, SegmentedList<ClassifiedSpan> result, CancellationToken cancellationToken)
         {
             if (project is null)
                 return;
 
             var root = semanticModel.SyntaxTree.GetRoot(cancellationToken);
-            var worker = new Worker(this, services, project, semanticModel, textSpan, options, result, cancellationToken);
+            var worker = new Worker(this, services, project, semanticModel, textSpans, options, result, cancellationToken);
             worker.VisitTokens(root);
         }
 
@@ -60,7 +61,7 @@ namespace Microsoft.CodeAnalysis.Classification
             SolutionServices solutionServices,
             Project project,
             SemanticModel semanticModel,
-            TextSpan textSpan,
+            TextSpan[] textSpans,
             ClassificationOptions options,
             SegmentedList<ClassifiedSpan> result,
             CancellationToken cancellationToken)
@@ -69,7 +70,7 @@ namespace Microsoft.CodeAnalysis.Classification
             private readonly SolutionServices _solutionServices = solutionServices;
             private readonly Project _project = project;
             private readonly SemanticModel _semanticModel = semanticModel;
-            private readonly TextSpan _textSpan = textSpan;
+            private readonly TextSpanIntervalTree _textSpanIntervalTree = new TextSpanIntervalTree(textSpans);
             private readonly ClassificationOptions _options = options;
             private readonly SegmentedList<ClassifiedSpan> _result = result;
             private readonly CancellationToken _cancellationToken = cancellationToken;
@@ -83,7 +84,7 @@ namespace Microsoft.CodeAnalysis.Classification
                 {
                     _cancellationToken.ThrowIfCancellationRequested();
                     var currentNodeOrToken = stack.Pop();
-                    if (currentNodeOrToken.Span.IntersectsWith(_textSpan))
+                    if (_textSpanIntervalTree.HasIntervalThatIntersectsWith(currentNodeOrToken.Span))
                     {
                         if (currentNodeOrToken.IsNode)
                         {
@@ -110,7 +111,7 @@ namespace Microsoft.CodeAnalysis.Classification
 
             private void ClassifyToken(SyntaxToken token)
             {
-                if (token.Span.IntersectsWith(_textSpan) && _owner.SyntaxTokenKinds.Contains(token.RawKind))
+                if (_textSpanIntervalTree.HasIntervalThatIntersectsWith(token.Span) && _owner.SyntaxTokenKinds.Contains(token.RawKind))
                 {
                     var context = new EmbeddedLanguageClassificationContext(
                         _solutionServices, _project, _semanticModel, token, _options, _owner.Info.VirtualCharService, _result, _cancellationToken);
@@ -143,7 +144,7 @@ namespace Microsoft.CodeAnalysis.Classification
 
             private void ProcessTrivia(SyntaxTrivia trivia)
             {
-                if (trivia.HasStructure && trivia.FullSpan.IntersectsWith(_textSpan))
+                if (trivia.HasStructure && _textSpanIntervalTree.HasIntervalThatIntersectsWith(trivia.FullSpan))
                     VisitTokens(trivia.GetStructure()!);
             }
         }

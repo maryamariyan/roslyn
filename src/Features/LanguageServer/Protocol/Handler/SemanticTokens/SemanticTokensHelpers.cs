@@ -4,6 +4,8 @@
 
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -22,6 +24,11 @@ namespace Microsoft.CodeAnalysis.LanguageServer.Handler.SemanticTokens
 {
     internal class SemanticTokensHelpers
     {
+        private static Random s_random = new Random();
+        private static bool s_stopExperiment = false;
+        private static List<long> s_old = new List<long>();
+        private static List<long> s_new = new List<long>();
+
         internal static async Task<int[]> HandleRequestHelperAsync(
             IGlobalOptionService globalOptions,
             SemanticTokensRefreshQueue semanticTokensRefreshQueue,
@@ -81,13 +88,29 @@ namespace Microsoft.CodeAnalysis.LanguageServer.Handler.SemanticTokens
             // We either calculate the tokens for the full document span, or the user 
             // can pass in a range from the full document if they wish.
             ranges ??= new[] { ProtocolConversions.TextSpanToRange(root.FullSpan, text) };
-
-            foreach (var range in ranges)
+            if (s_stopExperiment || s_random.Next(2) == 0)
             {
-                var textSpan = ProtocolConversions.RangeToTextSpan(range, text);
+                var textSpans = new TextSpan[ranges.Length];
+                for (var i = 0; i < ranges.Length; i++)
+                {
+                    textSpans[i] = ProtocolConversions.RangeToTextSpan(ranges[i], text);
+                }
 
+                var stopwatch = Stopwatch.StartNew();
                 await GetClassifiedSpansForDocumentAsync(
-                    classifiedSpans, document, textSpan, options, cancellationToken).ConfigureAwait(false);
+                    classifiedSpans, document, textSpans, options, cancellationToken).ConfigureAwait(false);
+                s_new.Add(stopwatch.ElapsedMilliseconds);
+            }
+            else
+            {
+                var range = new LSP.Range { Start = ranges[0].Start, End = ranges[ranges.Length - 1].End };
+                var textSpan = ProtocolConversions.RangeToTextSpan(range, text);
+                var textSpans = new TextSpan[] { textSpan };
+
+                var stopwatch2 = Stopwatch.StartNew();
+                await GetClassifiedSpansForDocumentAsync(
+                    classifiedSpans, document, textSpans, options, cancellationToken).ConfigureAwait(false);
+                s_old.Add(stopwatch2.ElapsedMilliseconds);
             }
 
             // Classified spans are not guaranteed to be returned in a certain order so we sort them to be safe.
@@ -105,7 +128,7 @@ namespace Microsoft.CodeAnalysis.LanguageServer.Handler.SemanticTokens
         private static async Task GetClassifiedSpansForDocumentAsync(
             SegmentedList<ClassifiedSpan> classifiedSpans,
             Document document,
-            TextSpan textSpan,
+            TextSpan[] textSpans,
             ClassificationOptions options,
             CancellationToken cancellationToken)
         {
@@ -116,7 +139,7 @@ namespace Microsoft.CodeAnalysis.LanguageServer.Handler.SemanticTokens
 
             // `includeAdditiveSpans` will add token modifiers such as 'static', which we want to include in LSP.
             var spans = await ClassifierHelper.GetClassifiedSpansAsync(
-                document, textSpan, options, includeAdditiveSpans: true, cancellationToken).ConfigureAwait(false);
+                document, textSpans, options, includeAdditiveSpans: true, cancellationToken).ConfigureAwait(false);
 
             // The spans returned to us may include some empty spans, which we don't care about. We also don't care
             // about the 'text' classification.  It's added for everything between real classifications (including

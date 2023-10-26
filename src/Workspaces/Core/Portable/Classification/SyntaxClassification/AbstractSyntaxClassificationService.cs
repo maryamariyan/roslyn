@@ -31,7 +31,7 @@ namespace Microsoft.CodeAnalysis.Classification
 
         public async Task AddSemanticClassificationsAsync(
             Document document,
-            TextSpan textSpan,
+            TextSpan[] textSpans,
             ClassificationOptions options,
             Func<SyntaxNode, ImmutableArray<ISyntaxClassifier>> getNodeClassifiers,
             Func<SyntaxToken, ImmutableArray<ISyntaxClassifier>> getTokenClassifiers,
@@ -41,7 +41,7 @@ namespace Microsoft.CodeAnalysis.Classification
             try
             {
                 var semanticModel = await document.GetRequiredSemanticModelAsync(cancellationToken).ConfigureAwait(false);
-                AddSemanticClassifications(semanticModel, textSpan, getNodeClassifiers, getTokenClassifiers, result, options, cancellationToken);
+                AddSemanticClassifications(semanticModel, textSpans, getNodeClassifiers, getTokenClassifiers, result, options, cancellationToken);
             }
             catch (Exception e) when (FatalError.ReportAndPropagateUnlessCanceled(e, cancellationToken))
             {
@@ -51,14 +51,14 @@ namespace Microsoft.CodeAnalysis.Classification
 
         public void AddSemanticClassifications(
             SemanticModel semanticModel,
-            TextSpan textSpan,
+            TextSpan[] textSpans,
             Func<SyntaxNode, ImmutableArray<ISyntaxClassifier>> getNodeClassifiers,
             Func<SyntaxToken, ImmutableArray<ISyntaxClassifier>> getTokenClassifiers,
             SegmentedList<ClassifiedSpan> result,
             ClassificationOptions options,
             CancellationToken cancellationToken)
         {
-            Worker.Classify(semanticModel, textSpan, result, getNodeClassifiers, getTokenClassifiers, options, cancellationToken);
+            Worker.Classify(semanticModel, textSpans, result, getNodeClassifiers, getTokenClassifiers, options, cancellationToken);
         }
 
         public TextChangeRange? ComputeSyntacticChangeRange(SyntaxNode oldRoot, SyntaxNode newRoot, TimeSpan timeout, CancellationToken cancellationToken)

@@ -6,7 +6,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.Collections;
 using Microsoft.CodeAnalysis.Host;
-using Microsoft.CodeAnalysis.PooledObjects;
 using Microsoft.CodeAnalysis.Text;
 
 namespace Microsoft.CodeAnalysis.Classification
@@ -15,7 +14,7 @@ namespace Microsoft.CodeAnalysis.Classification
     {
         Task AddEmbeddedLanguageClassificationsAsync(
             Document document,
-            TextSpan textSpan,
+            TextSpan[] textSpans,
             ClassificationOptions options,
             SegmentedList<ClassifiedSpan> result,
             CancellationToken cancellationToken);
@@ -24,7 +23,7 @@ namespace Microsoft.CodeAnalysis.Classification
             SolutionServices solutionServices,
             Project project,
             SemanticModel semanticModel,
-            TextSpan textSpan,
+            TextSpan[] textSpans,
             ClassificationOptions options,
             SegmentedList<ClassifiedSpan> result,
             CancellationToken cancellationToken);

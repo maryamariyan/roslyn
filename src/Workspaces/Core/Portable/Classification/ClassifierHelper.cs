@@ -8,6 +8,7 @@ using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.Collections;
+using Microsoft.CodeAnalysis.PooledObjects;
 using Microsoft.CodeAnalysis.Shared.Collections;
 using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.CodeAnalysis.Text;
@@ -17,7 +18,7 @@ namespace Microsoft.CodeAnalysis.Classification
     internal static partial class ClassifierHelper
     {
         /// <summary>
-        /// Classifies the provided <paramref name="span"/> in the given <paramref name="document"/>. This will do this
+        /// Classifies the provided <paramref name="spans"/> in the given <paramref name="document"/>. This will do this
         /// using an appropriate <see cref="IClassificationService"/> if that can be found.  <see
         /// cref="ImmutableArray{T}.IsDefault"/> will be returned if this fails.
         /// </summary>
@@ -26,7 +27,7 @@ namespace Microsoft.CodeAnalysis.Classification
         /// overwritten'.  i.e. they add additional information to a previous classification.</param>
         public static async Task<ImmutableArray<ClassifiedSpan>> GetClassifiedSpansAsync(
             Document document,
-            TextSpan span,
+            TextSpan[] spans,
             ClassificationOptions options,
             bool includeAdditiveSpans,
             CancellationToken cancellationToken)
@@ -45,12 +46,15 @@ namespace Microsoft.CodeAnalysis.Classification
             using var _1 = Classifier.GetPooledList(out var syntaxSpans);
             using var _2 = Classifier.GetPooledList(out var semanticSpans);
 
-            await classificationService.AddSyntacticClassificationsAsync(document, span, syntaxSpans, cancellationToken).ConfigureAwait(false);
+            for (var i = 0; i < spans.Length; i++)
+            {
+                await classificationService.AddSyntacticClassificationsAsync(document, spans[i], syntaxSpans, cancellationToken).ConfigureAwait(false);
+            }
 
             // Intentional that we're adding both semantic and embedded lang classifications to the same array.  Both
             // are 'semantic' from the perspective of this helper method.
-            await classificationService.AddSemanticClassificationsAsync(document, span, options, semanticSpans, cancellationToken).ConfigureAwait(false);
-            await classificationService.AddEmbeddedLanguageClassificationsAsync(document, span, options, semanticSpans, cancellationToken).ConfigureAwait(false);
+            await classificationService.AddSemanticClassificationsAsync(document, spans, options, semanticSpans, cancellationToken).ConfigureAwait(false);
+            await classificationService.AddEmbeddedLanguageClassificationsAsync(document, spans, options, semanticSpans, cancellationToken).ConfigureAwait(false);
 
             // MergeClassifiedSpans will ultimately filter multiple classifications for the same
             // span down to one. We know that additive classifications are there just to 
@@ -64,7 +68,8 @@ namespace Microsoft.CodeAnalysis.Classification
                 RemoveAdditiveSpans(semanticSpans);
             }
 
-            var classifiedSpans = MergeClassifiedSpans(syntaxSpans, semanticSpans, span);
+            var widenedSpan = new TextSpan(spans[0].Start, spans[^1].End);
+            var classifiedSpans = MergeClassifiedSpans(syntaxSpans, semanticSpans, widenedSpan);
             return classifiedSpans;
         }
 

@@ -196,12 +196,12 @@ namespace Microsoft.CodeAnalysis.Classification
             if (type == ClassificationType.Semantic)
             {
                 await classificationService.AddSemanticClassificationsAsync(
-                   document, snapshotSpan.Span.ToTextSpan(), options, classifiedSpans, cancellationToken).ConfigureAwait(false);
+                   document, new[] { snapshotSpan.Span.ToTextSpan() }, options, classifiedSpans, cancellationToken).ConfigureAwait(false);
             }
             else if (type == ClassificationType.EmbeddedLanguage)
             {
                 await classificationService.AddEmbeddedLanguageClassificationsAsync(
-                   document, snapshotSpan.Span.ToTextSpan(), options, classifiedSpans, cancellationToken).ConfigureAwait(false);
+                   document, new[] { snapshotSpan.Span.ToTextSpan() }, options, classifiedSpans, cancellationToken).ConfigureAwait(false);
             }
             else
             {

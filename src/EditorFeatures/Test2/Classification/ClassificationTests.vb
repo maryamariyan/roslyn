@@ -2,6 +2,7 @@
 ' The .NET Foundation licenses this file to you under the MIT license.
 ' See the LICENSE file in the project root for more information.
 
+Imports System.Collections.Immutable
 Imports System.Composition
 Imports System.Threading
 Imports Microsoft.CodeAnalysis.Classification
@@ -94,8 +95,9 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.Classification
                 Dim document = workspace.CurrentSolution.Projects.Single().Documents.Single()
                 Dim text = Await document.GetTextAsync()
 
+                Dim spanArray As TextSpan() = {New TextSpan(0, text.Length)}
                 Dim spans = Await ClassifierHelper.GetClassifiedSpansAsync(
-                    document, New TextSpan(0, text.Length), ClassificationOptions.Default, includeAdditiveSpans:=False, CancellationToken.None)
+                    document, spanArray, ClassificationOptions.Default, includeAdditiveSpans:=False, CancellationToken.None)
 
                 Assert.Equal(
 "(text, '<spaces>', [0..26))
@@ -155,8 +157,9 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.Classification
                 Dim document = workspace.CurrentSolution.Projects.Single().Documents.Single()
                 Dim text = Await document.GetTextAsync()
 
+                Dim spanArray As TextSpan() = {New TextSpan(0, text.Length)}
                 Dim spans = Await ClassifierHelper.GetClassifiedSpansAsync(
-                    document, New TextSpan(0, text.Length), ClassificationOptions.Default, includeAdditiveSpans:=False, CancellationToken.None)
+                    document, spanArray, ClassificationOptions.Default, includeAdditiveSpans:=False, CancellationToken.None)
 
                 Assert.Equal(
 "(text, '<spaces>', [0..26))
@@ -329,8 +332,9 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.Classification
 
                 ' make sure we don't crash with wrong document
                 Dim result = New SegmentedList(Of ClassifiedSpan)()
+                Dim spanArray As TextSpan() = {New TextSpan(0, text.Length)}
                 Await classificationService.AddSyntacticClassificationsAsync(wrongDocument, New TextSpan(0, text.Length), result, CancellationToken.None)
-                Await classificationService.AddSemanticClassificationsAsync(wrongDocument, New TextSpan(0, text.Length), options:=Nothing, result, CancellationToken.None)
+                Await classificationService.AddSemanticClassificationsAsync(wrongDocument, spanArray, options:=Nothing, result, CancellationToken.None)
             End Using
         End Function
 
@@ -349,7 +353,7 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.Classification
             Public Sub AddSyntacticClassifications(services As SolutionServices, root As SyntaxNode, textSpan As TextSpan, result As SegmentedList(Of ClassifiedSpan), cancellationToken As CancellationToken) Implements IClassificationService.AddSyntacticClassifications
             End Sub
 
-            Public Function AddSemanticClassificationsAsync(document As Document, textSpan As TextSpan, options As ClassificationOptions, result As SegmentedList(Of ClassifiedSpan), cancellationToken As CancellationToken) As Task Implements IClassificationService.AddSemanticClassificationsAsync
+            Public Function AddSemanticClassificationsAsync(document As Document, textSpans() As TextSpan, options As ClassificationOptions, result As SegmentedList(Of ClassifiedSpan), cancellationToken As CancellationToken) As Task Implements IClassificationService.AddSemanticClassificationsAsync
                 Return Task.CompletedTask
             End Function
 
@@ -368,7 +372,7 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.Classification
                 Return Nothing
             End Function
 
-            Public Function AddEmbeddedLanguageClassificationsAsync(document As Document, textSpan As TextSpan, options As ClassificationOptions, result As SegmentedList(Of ClassifiedSpan), cancellationToken As CancellationToken) As Task Implements IClassificationService.AddEmbeddedLanguageClassificationsAsync
+            Public Function AddEmbeddedLanguageClassificationsAsync(document As Document, textSpans() As TextSpan, options As ClassificationOptions, result As SegmentedList(Of ClassifiedSpan), cancellationToken As CancellationToken) As Task Implements IClassificationService.AddEmbeddedLanguageClassificationsAsync
                 Return Task.CompletedTask
             End Function
         End Class

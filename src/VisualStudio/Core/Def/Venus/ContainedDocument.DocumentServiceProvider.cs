@@ -198,7 +198,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Venus
                         // sure we map it to right snapshot
                         var fixedUpSpan = roslynSpan.TranslateTo(roslynSnapshot, SpanTrackingMode.EdgeExclusive);
                         var classifiedSpans = await ClassifierHelper.GetClassifiedSpansAsync(
-                            document, fixedUpSpan.Span.ToTextSpan(), options, includeAdditiveSpans: false, cancellationToken).ConfigureAwait(false);
+                            document, new[] { fixedUpSpan.Span.ToTextSpan() }, options, includeAdditiveSpans: false, cancellationToken).ConfigureAwait(false);
                         if (classifiedSpans.IsDefault)
                         {
                             continue;
