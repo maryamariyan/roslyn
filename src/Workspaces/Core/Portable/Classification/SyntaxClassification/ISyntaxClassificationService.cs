@@ -26,7 +26,7 @@ namespace Microsoft.CodeAnalysis.Classification
         /// <inheritdoc cref="IClassificationService.AddSyntacticClassificationsAsync"/>
         void AddSyntacticClassifications(
             SyntaxNode root,
-            TextSpan textSpan,
+            ImmutableArray<TextSpan> textSpans,
             SegmentedList<ClassifiedSpan> result,
             CancellationToken cancellationToken);
 

@@ -49,11 +49,14 @@ namespace Microsoft.CodeAnalysis.ExternalAccess.FSharp.Internal.Classification
             }
         }
 
-        public async Task AddSyntacticClassificationsAsync(Document document, TextSpan textSpan, SegmentedList<ClassifiedSpan> result, CancellationToken cancellationToken)
+        public async Task AddSyntacticClassificationsAsync(Document document, ImmutableArray<TextSpan> textSpans, SegmentedList<ClassifiedSpan> result, CancellationToken cancellationToken)
         {
-            using var _ = s_listPool.GetPooledObject(out var list);
-            await _service.AddSyntacticClassificationsAsync(document, textSpan, list, cancellationToken).ConfigureAwait(false);
-            result.AddRange(list);
+            foreach (var textSpan in textSpans)
+            {
+                using var _ = s_listPool.GetPooledObject(out var list);
+                await _service.AddSyntacticClassificationsAsync(document, textSpan, list, cancellationToken).ConfigureAwait(false);
+                result.AddRange(list);
+            }
         }
 
         public ClassifiedSpan AdjustStaleClassification(SourceText text, ClassifiedSpan classifiedSpan)
@@ -61,7 +64,7 @@ namespace Microsoft.CodeAnalysis.ExternalAccess.FSharp.Internal.Classification
             return _service.AdjustStaleClassification(text, classifiedSpan);
         }
 
-        public void AddSyntacticClassifications(SolutionServices services, SyntaxNode root, TextSpan textSpan, SegmentedList<ClassifiedSpan> result, CancellationToken cancellationToken)
+        public void AddSyntacticClassifications(SolutionServices services, SyntaxNode root, ImmutableArray<TextSpan> textSpans, SegmentedList<ClassifiedSpan> result, CancellationToken cancellationToken)
         {
             // F# does not support syntax.
         }

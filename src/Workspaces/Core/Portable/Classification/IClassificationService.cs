@@ -31,7 +31,7 @@ namespace Microsoft.CodeAnalysis.Classification
         /// <remarks>This method is optional and only should be implemented by languages that support
         /// syntax.  If the language does not support syntax, callers should use
         /// <see cref="AddSyntacticClassificationsAsync"/> instead.</remarks>
-        void AddSyntacticClassifications(SolutionServices services, SyntaxNode root, TextSpan textSpan, SegmentedList<ClassifiedSpan> result, CancellationToken cancellationToken);
+        void AddSyntacticClassifications(SolutionServices services, SyntaxNode root, ImmutableArray<TextSpan> textSpans, SegmentedList<ClassifiedSpan> result, CancellationToken cancellationToken);
 
         /// <summary>
         /// Produce the classifications for the span of text specified.  The syntax of the document 
@@ -39,7 +39,7 @@ namespace Microsoft.CodeAnalysis.Classification
         /// be used to determine if a piece of text that looks like a keyword should actually be
         /// considered an identifier in its current context.
         /// </summary>
-        Task AddSyntacticClassificationsAsync(Document document, TextSpan textSpan, SegmentedList<ClassifiedSpan> result, CancellationToken cancellationToken);
+        Task AddSyntacticClassificationsAsync(Document document, ImmutableArray<TextSpan> textSpans, SegmentedList<ClassifiedSpan> result, CancellationToken cancellationToken);
 
         /// <summary>
         /// Produce the classifications for the span of text specified.  Semantics of the language can be used to

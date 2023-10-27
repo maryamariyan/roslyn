@@ -65,10 +65,7 @@ namespace Microsoft.CodeAnalysis.Classification
             using var _1 = Classifier.GetPooledList(out var syntaxSpans);
             using var _2 = Classifier.GetPooledList(out var semanticSpans);
 
-            for (var i = 0; i < spans.Length; i++)
-            {
-                await classificationService.AddSyntacticClassificationsAsync(document, spans[i], syntaxSpans, cancellationToken).ConfigureAwait(false);
-            }
+            await classificationService.AddSyntacticClassificationsAsync(document, spans, syntaxSpans, cancellationToken).ConfigureAwait(false);
 
             // Intentional that we're adding both semantic and embedded lang classifications to the same array.  Both
             // are 'semantic' from the perspective of this helper method.

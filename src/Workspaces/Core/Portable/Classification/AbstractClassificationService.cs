@@ -183,14 +183,14 @@ namespace Microsoft.CodeAnalysis.Classification
             }
         }
 
-        public async Task AddSyntacticClassificationsAsync(Document document, TextSpan textSpan, SegmentedList<ClassifiedSpan> result, CancellationToken cancellationToken)
+        public async Task AddSyntacticClassificationsAsync(Document document, ImmutableArray<TextSpan> textSpans, SegmentedList<ClassifiedSpan> result, CancellationToken cancellationToken)
         {
             var root = await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
-            AddSyntacticClassifications(document.Project.Solution.Services, root, textSpan, result, cancellationToken);
+            AddSyntacticClassifications(document.Project.Solution.Services, root, textSpans, result, cancellationToken);
         }
 
         public void AddSyntacticClassifications(
-            SolutionServices services, SyntaxNode? root, TextSpan textSpan, SegmentedList<ClassifiedSpan> result, CancellationToken cancellationToken)
+            SolutionServices services, SyntaxNode? root, ImmutableArray<TextSpan> textSpans, SegmentedList<ClassifiedSpan> result, CancellationToken cancellationToken)
         {
             if (root == null)
                 return;
@@ -199,7 +199,7 @@ namespace Microsoft.CodeAnalysis.Classification
             if (classificationService == null)
                 return;
 
-            classificationService.AddSyntacticClassifications(root, textSpan, result, cancellationToken);
+            classificationService.AddSyntacticClassifications(root, textSpans, result, cancellationToken);
         }
 
         /// <summary>

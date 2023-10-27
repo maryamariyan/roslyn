@@ -6,22 +6,52 @@ using System.Collections.Immutable;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.Collections;
+using Microsoft.CodeAnalysis.Host;
 using Microsoft.CodeAnalysis.Text;
 
 namespace Microsoft.CodeAnalysis.Classification
 {
     internal static partial class ClassificationServiceExtensions
     {
+        public static void AddSyntacticClassifications(
+            this IClassificationService classificationService,
+            SolutionServices services,
+            SyntaxNode root,
+            TextSpan textSpan,
+            SegmentedList<ClassifiedSpan> result,
+            CancellationToken cancellationToken)
+        {
+            classificationService.AddSyntacticClassifications(services, root, ImmutableArray.Create(textSpan), result, cancellationToken);
+        }
+
+        public static Task AddSyntacticClassificationsAsync(
+            this IClassificationService classificationService,
+            Document document,
+            TextSpan textSpan,
+            SegmentedList<ClassifiedSpan> result,
+            CancellationToken cancellationToken)
+        {
+            return classificationService.AddSyntacticClassificationsAsync(document, ImmutableArray.Create(textSpan), result, cancellationToken);
+        }
+
         public static Task AddSemanticClassificationsAsync(
             this IClassificationService classificationService,
-            Document document, TextSpan textSpan, ClassificationOptions options, SegmentedList<ClassifiedSpan> result, CancellationToken cancellationToken)
+            Document document,
+            TextSpan textSpan,
+            ClassificationOptions options,
+            SegmentedList<ClassifiedSpan> result,
+            CancellationToken cancellationToken)
         {
             return classificationService.AddSemanticClassificationsAsync(document, ImmutableArray.Create(textSpan), options, result, cancellationToken);
         }
 
         public static Task AddEmbeddedLanguageClassificationsAsync(
             this IClassificationService classificationService,
-            Document document, TextSpan textSpan, ClassificationOptions options, SegmentedList<ClassifiedSpan> result, CancellationToken cancellationToken)
+            Document document,
+            TextSpan textSpan,
+            ClassificationOptions options,
+            SegmentedList<ClassifiedSpan> result,
+            CancellationToken cancellationToken)
         {
             return classificationService.AddEmbeddedLanguageClassificationsAsync(document, ImmutableArray.Create(textSpan), options, result, cancellationToken);
         }

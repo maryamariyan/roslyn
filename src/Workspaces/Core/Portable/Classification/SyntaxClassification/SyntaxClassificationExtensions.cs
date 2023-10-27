@@ -14,6 +14,16 @@ namespace Microsoft.CodeAnalysis.Classification
 {
     internal static class SyntaxClassificationServiceExtensions
     {
+        public static void AddSyntacticClassifications(
+            this ISyntaxClassificationService classificationService,
+            SyntaxNode root,
+            TextSpan textSpan,
+            SegmentedList<ClassifiedSpan> result,
+            CancellationToken cancellationToken)
+        {
+            classificationService.AddSyntacticClassifications(root, ImmutableArray.Create(textSpan), result, cancellationToken);
+        }
+
         public static Task AddSemanticClassificationsAsync(
             this ISyntaxClassificationService classificationService,
             Document document,

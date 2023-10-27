@@ -22,7 +22,7 @@ namespace Microsoft.CodeAnalysis.Classification
         }
 
         public abstract void AddLexicalClassifications(SourceText text, TextSpan textSpan, SegmentedList<ClassifiedSpan> result, CancellationToken cancellationToken);
-        public abstract void AddSyntacticClassifications(SyntaxNode root, TextSpan textSpan, SegmentedList<ClassifiedSpan> result, CancellationToken cancellationToken);
+        public abstract void AddSyntacticClassifications(SyntaxNode root, ImmutableArray<TextSpan> textSpans, SegmentedList<ClassifiedSpan> result, CancellationToken cancellationToken);
 
         public abstract ImmutableArray<ISyntaxClassifier> GetDefaultSyntaxClassifiers();
         public abstract ClassifiedSpan FixClassification(SourceText text, ClassifiedSpan classifiedSpan);
