@@ -4,6 +4,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.Collections;
@@ -13,7 +14,6 @@ using Microsoft.CodeAnalysis.PooledObjects;
 using Microsoft.CodeAnalysis.ReassignedVariable;
 using Microsoft.CodeAnalysis.Remote;
 using Microsoft.CodeAnalysis.Shared.Extensions;
-using Microsoft.CodeAnalysis.Storage;
 using Microsoft.CodeAnalysis.Text;
 using Roslyn.Utilities;
 
@@ -25,20 +25,20 @@ namespace Microsoft.CodeAnalysis.Classification
         public abstract ClassifiedSpan AdjustStaleClassification(SourceText text, ClassifiedSpan classifiedSpan);
 
         public Task AddSemanticClassificationsAsync(
-            Document document, TextSpan[] textSpans, ClassificationOptions options, SegmentedList<ClassifiedSpan> result, CancellationToken cancellationToken)
+            Document document, ImmutableArray<TextSpan> textSpans, ClassificationOptions options, SegmentedList<ClassifiedSpan> result, CancellationToken cancellationToken)
         {
             return AddClassificationsAsync(document, textSpans, options, ClassificationType.Semantic, result, cancellationToken);
         }
 
         public Task AddEmbeddedLanguageClassificationsAsync(
-            Document document, TextSpan[] textSpans, ClassificationOptions options, SegmentedList<ClassifiedSpan> result, CancellationToken cancellationToken)
+            Document document, ImmutableArray<TextSpan> textSpans, ClassificationOptions options, SegmentedList<ClassifiedSpan> result, CancellationToken cancellationToken)
         {
             return AddClassificationsAsync(document, textSpans, options, ClassificationType.EmbeddedLanguage, result, cancellationToken);
         }
 
         private static async Task AddClassificationsAsync(
             Document document,
-            TextSpan[] textSpans,
+            ImmutableArray<TextSpan> textSpans,
             ClassificationOptions options,
             ClassificationType type,
             SegmentedList<ClassifiedSpan> result,
@@ -111,7 +111,7 @@ namespace Microsoft.CodeAnalysis.Classification
 
         private static async Task<bool> TryGetCachedClassificationsAsync(
             Document document,
-            TextSpan[] textSpans,
+            ImmutableArray<TextSpan> textSpans,
             ClassificationType type,
             RemoteHostClient client,
             bool isFullyLoaded,
@@ -141,7 +141,7 @@ namespace Microsoft.CodeAnalysis.Classification
 
         public static async Task AddClassificationsInCurrentProcessAsync(
             Document document,
-            TextSpan[] textSpans,
+            ImmutableArray<TextSpan> textSpans,
             ClassificationType type,
             ClassificationOptions options,
             SegmentedList<ClassifiedSpan> result,
@@ -163,12 +163,9 @@ namespace Microsoft.CodeAnalysis.Classification
 
                 if (options.ClassifyReassignedVariables)
                 {
-                    foreach (var textSpan in textSpans)
-                    {
-                        var reassignedVariableSpans = await reassignedVariableService.GetLocationsAsync(document, textSpan, cancellationToken).ConfigureAwait(false);
-                        foreach (var span in reassignedVariableSpans)
-                            result.Add(new ClassifiedSpan(span, ClassificationTypeNames.ReassignedVariable));
-                    }
+                    var reassignedVariableSpans = await reassignedVariableService.GetLocationsAsync(document, textSpans, cancellationToken).ConfigureAwait(false);
+                    foreach (var span in reassignedVariableSpans)
+                        result.Add(new ClassifiedSpan(span, ClassificationTypeNames.ReassignedVariable));
                 }
             }
             else if (type == ClassificationType.EmbeddedLanguage)

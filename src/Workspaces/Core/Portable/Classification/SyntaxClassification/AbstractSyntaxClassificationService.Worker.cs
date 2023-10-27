@@ -55,7 +55,7 @@ namespace Microsoft.CodeAnalysis.Classification
 
             internal static void Classify(
                 SemanticModel semanticModel,
-                TextSpan[] textSpans,
+                ImmutableArray<TextSpan> textSpans,
                 SegmentedList<ClassifiedSpan> list,
                 Func<SyntaxNode, ImmutableArray<ISyntaxClassifier>> getNodeClassifiers,
                 Func<SyntaxToken, ImmutableArray<ISyntaxClassifier>> getTokenClassifiers,
@@ -65,6 +65,7 @@ namespace Microsoft.CodeAnalysis.Classification
                 foreach (var textSpan in textSpans)
                 {
                     using var worker = new Worker(semanticModel, textSpan, list, getNodeClassifiers, getTokenClassifiers, options, cancellationToken);
+
                     worker._pendingNodes.Push(worker._syntaxTree.GetRoot(cancellationToken));
                     worker.ProcessNodes();
                 }
@@ -82,7 +83,7 @@ namespace Microsoft.CodeAnalysis.Classification
 
             private void AddClassification(TextSpan textSpan, string type)
             {
-                if (textSpan.Length > 0 && textSpan.IntersectsWith(_textSpan))
+                if (textSpan.Length > 0 && textSpan.OverlapsWith(_textSpan))
                 {
                     var tuple = new ClassifiedSpan(type, textSpan);
                     if (!_set.Contains(tuple))
@@ -129,9 +130,8 @@ namespace Microsoft.CodeAnalysis.Classification
             {
                 using var obj = s_listPool.GetPooledObject();
                 var list = obj.Object;
-                var classifiers = _getNodeClassifiers(syntax);
 
-                foreach (var classifier in classifiers)
+                foreach (var classifier in _getNodeClassifiers(syntax))
                 {
                     _cancellationToken.ThrowIfCancellationRequested();
 

@@ -81,7 +81,7 @@ namespace Microsoft.CodeAnalysis.Remote
             };
 
         public async ValueTask<SerializableClassifiedSpans?> GetCachedClassificationsAsync(
-            DocumentKey documentKey, TextSpan[] textSpans, ClassificationType type, Checksum checksum, CancellationToken cancellationToken)
+            DocumentKey documentKey, ImmutableArray<TextSpan> textSpans, ClassificationType type, Checksum checksum, CancellationToken cancellationToken)
         {
             var classifiedSpans = await TryGetOrReadCachedSemanticClassificationsAsync(
                 documentKey, type, checksum, cancellationToken).ConfigureAwait(false);
@@ -140,7 +140,7 @@ namespace Microsoft.CodeAnalysis.Remote
 
             // Compute classifications for the full span.
             var text = await document.GetValueTextAsync(cancellationToken).ConfigureAwait(false);
-            await classificationService.AddSemanticClassificationsAsync(document, new[] { new TextSpan(0, text.Length) }, options, classifiedSpans, cancellationToken).ConfigureAwait(false);
+            await classificationService.AddSemanticClassificationsAsync(document, new TextSpan(0, text.Length), options, classifiedSpans, cancellationToken).ConfigureAwait(false);
 
             using var stream = SerializableBytes.CreateWritableStream();
             using (var writer = new ObjectWriter(stream, leaveOpen: true, cancellationToken))

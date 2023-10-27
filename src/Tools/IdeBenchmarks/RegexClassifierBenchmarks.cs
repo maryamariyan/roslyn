@@ -87,7 +87,7 @@ class Program
 
             await service.AddSemanticClassificationsAsync(
                 document,
-                new[] { span },
+                span,
                 ClassificationOptions.Default,
                 extensionManager.CreateNodeExtensionGetter(classifiers, c => c.SyntaxNodeTypes),
                 extensionManager.CreateTokenExtensionGetter(classifiers, c => c.SyntaxTokenKinds),

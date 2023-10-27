@@ -9,7 +9,6 @@ using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.Classification.Classifiers;
 using Microsoft.CodeAnalysis.Collections;
 using Microsoft.CodeAnalysis.ErrorReporting;
-using Microsoft.CodeAnalysis.PooledObjects;
 using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.CodeAnalysis.Text;
 using Roslyn.Utilities;
@@ -31,7 +30,7 @@ namespace Microsoft.CodeAnalysis.Classification
 
         public async Task AddSemanticClassificationsAsync(
             Document document,
-            TextSpan[] textSpans,
+            ImmutableArray<TextSpan> textSpans,
             ClassificationOptions options,
             Func<SyntaxNode, ImmutableArray<ISyntaxClassifier>> getNodeClassifiers,
             Func<SyntaxToken, ImmutableArray<ISyntaxClassifier>> getTokenClassifiers,
@@ -51,7 +50,7 @@ namespace Microsoft.CodeAnalysis.Classification
 
         public void AddSemanticClassifications(
             SemanticModel semanticModel,
-            TextSpan[] textSpans,
+            ImmutableArray<TextSpan> textSpans,
             Func<SyntaxNode, ImmutableArray<ISyntaxClassifier>> getNodeClassifiers,
             Func<SyntaxToken, ImmutableArray<ISyntaxClassifier>> getTokenClassifiers,
             SegmentedList<ClassifiedSpan> result,

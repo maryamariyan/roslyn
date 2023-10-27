@@ -110,11 +110,11 @@ namespace Microsoft.CodeAnalysis.Classification
             var root = semanticModel.SyntaxTree.GetRoot(cancellationToken);
 
             classificationService.AddSyntacticClassifications(root, textSpan, syntacticClassifications, cancellationToken);
-            classificationService.AddSemanticClassifications(semanticModel, new[] { textSpan }, getNodeClassifiers, getTokenClassifiers, semanticClassifications, options, cancellationToken);
+            classificationService.AddSemanticClassifications(semanticModel, textSpan, getNodeClassifiers, getTokenClassifiers, semanticClassifications, options, cancellationToken);
 
             // intentionally adding to the semanticClassifications array here.
             if (includedEmbeddedClassifications && project != null)
-                embeddedLanguageService.AddEmbeddedLanguageClassifications(services, project, semanticModel, new[] { textSpan }, options, semanticClassifications, cancellationToken);
+                embeddedLanguageService.AddEmbeddedLanguageClassifications(services, project, semanticModel, textSpan, options, semanticClassifications, cancellationToken);
 
             var allClassifications = new List<ClassifiedSpan>(semanticClassifications.Where(s => s.TextSpan.OverlapsWith(textSpan)));
             var semanticSet = semanticClassifications.Select(s => s.TextSpan).ToSet();

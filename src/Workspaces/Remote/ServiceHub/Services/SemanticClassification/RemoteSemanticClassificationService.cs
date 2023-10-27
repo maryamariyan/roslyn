@@ -22,7 +22,7 @@ namespace Microsoft.CodeAnalysis.Remote
         public ValueTask<SerializableClassifiedSpans> GetClassificationsAsync(
             Checksum solutionChecksum,
             DocumentId documentId,
-            TextSpan[] spans,
+            ImmutableArray<TextSpan> spans,
             ClassificationType type,
             ClassificationOptions options,
             bool isFullyLoaded,

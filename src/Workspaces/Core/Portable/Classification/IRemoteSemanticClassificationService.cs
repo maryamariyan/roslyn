@@ -20,7 +20,7 @@ namespace Microsoft.CodeAnalysis.Classification
         ValueTask<SerializableClassifiedSpans> GetClassificationsAsync(
             Checksum solutionChecksum,
             DocumentId documentId,
-            TextSpan[] spans,
+            ImmutableArray<TextSpan> textSpans,
             ClassificationType type,
             ClassificationOptions options,
             bool isFullyLoaded,
@@ -34,7 +34,7 @@ namespace Microsoft.CodeAnalysis.Classification
         /// classifications are only returned if they match the content the file currently has.</param>
         ValueTask<SerializableClassifiedSpans?> GetCachedClassificationsAsync(
             DocumentKey documentKey,
-            TextSpan[] textSpans,
+            ImmutableArray<TextSpan> textSpans,
             ClassificationType type,
             Checksum checksum,
             CancellationToken cancellationToken);

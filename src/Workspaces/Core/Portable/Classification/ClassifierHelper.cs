@@ -8,7 +8,7 @@ using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.Collections;
-using Microsoft.CodeAnalysis.PooledObjects;
+using Microsoft.CodeAnalysis.Host;
 using Microsoft.CodeAnalysis.Shared.Collections;
 using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.CodeAnalysis.Text;
@@ -17,6 +17,25 @@ namespace Microsoft.CodeAnalysis.Classification
 {
     internal static partial class ClassifierHelper
     {
+        /// <summary>
+        /// Classifies the provided <paramref name="span"/> in the given <paramref name="document"/>. This will do this
+        /// using an appropriate <see cref="IClassificationService"/> if that can be found.  <see
+        /// cref="ImmutableArray{T}.IsDefault"/> will be returned if this fails.
+        /// </summary>
+        /// <param name="includeAdditiveSpans">Whether or not 'additive' classification spans are included in the
+        /// results or not.  'Additive' spans are things like 'this variable is static' or 'this variable is
+        /// overwritten'.  i.e. they add additional information to a previous classification.</param>
+        public static async Task<ImmutableArray<ClassifiedSpan>> GetClassifiedSpansAsync(
+            Document document,
+            TextSpan span,
+            ClassificationOptions options,
+            bool includeAdditiveSpans,
+            CancellationToken cancellationToken)
+        {
+            return await GetClassifiedSpansAsync(document, ImmutableArray.Create(span), options, includeAdditiveSpans, cancellationToken)
+                .ConfigureAwait(false);
+        }
+
         /// <summary>
         /// Classifies the provided <paramref name="spans"/> in the given <paramref name="document"/>. This will do this
         /// using an appropriate <see cref="IClassificationService"/> if that can be found.  <see
@@ -27,7 +46,7 @@ namespace Microsoft.CodeAnalysis.Classification
         /// overwritten'.  i.e. they add additional information to a previous classification.</param>
         public static async Task<ImmutableArray<ClassifiedSpan>> GetClassifiedSpansAsync(
             Document document,
-            TextSpan[] spans,
+            ImmutableArray<TextSpan> spans,
             ClassificationOptions options,
             bool includeAdditiveSpans,
             CancellationToken cancellationToken)
