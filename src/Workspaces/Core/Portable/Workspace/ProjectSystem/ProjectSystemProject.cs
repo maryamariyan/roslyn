@@ -998,6 +998,20 @@ namespace Microsoft.CodeAnalysis.Workspaces.ProjectSystem
             if (fullPath.LastIndexOf(s_razorSourceGeneratorSdkDirectory, StringComparison.OrdinalIgnoreCase) + s_razorSourceGeneratorSdkDirectory.Length - 1 ==
                 fullPath.LastIndexOf(Path.DirectorySeparatorChar))
             {
+                var inVSCode = false;
+                if (inVSCode)
+                {
+                    if (s_razorSourceGeneratorAssemblyRootedFileNames.Any(
+                        static (fileName, fullPath) => fullPath.EndsWith(fileName, StringComparison.OrdinalIgnoreCase), fullPath))
+                    {
+                        // Return the hardcoded path to the Razor source generator in the VS Code extension
+                        var vsCodeRazorSourceGeneratorPath = ""; // maybe path to .razor folder if that is the on containing the source generator in vs code???
+                        return OneOrMany.Create(vsCodeRazorSourceGeneratorPath);
+                    }
+
+                    return OneOrMany.Create(ImmutableArray<string>.Empty);
+                }
+
                 var vsixRazorAnalyzers = _hostInfo.HostDiagnosticAnalyzerProvider.GetAnalyzerReferencesInExtensions().SelectAsArray(
                     predicate: item => item.extensionId == RazorVsixExtensionId,
                     selector: item => item.reference.FullPath);
