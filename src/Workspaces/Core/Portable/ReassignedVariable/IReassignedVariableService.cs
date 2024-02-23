@@ -17,6 +17,7 @@ namespace Microsoft.CodeAnalysis.ReassignedVariable
     /// </summary>
     internal interface IReassignedVariableService : ILanguageService
     {
-        Task<ImmutableArray<TextSpan>> GetLocationsAsync(Document document, ImmutableArray<TextSpan> textSpans, CancellationToken cancellationToken);
+        // TODO change signature
+        Task<ImmutableArray<TextSpan>> GetLocationsAsync(Document document, ImmutableArray<TextSpan> textSpans, /*ClassificationOptions options, */CancellationToken cancellationToken);
     }
 }
